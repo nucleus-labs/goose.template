@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# set -x
 
 [[ ! -f "arg_parse.bash" ]] && {
     echo "arg_parse.bash is missing! Critical dependency! Exiting..." >&2
@@ -38,9 +37,9 @@ function main () {
 
     validate_flags
     execute_flags
-    scrub_flags
-    
+
     validate_target
+
     cleanup
 }
 
