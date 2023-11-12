@@ -80,7 +80,7 @@ function validate_dependencies () {
     for (( i=0; i<${#all_deps[@]}; i++ )); do
         which "${all_deps[i]}" &> /dev/null
         local _ret=$?
-        [[ ${_ret} -ne 0 ]] && missing_deps+="\n    ${missing_deps[i]}"
+        [[ ${_ret} -ne 0 ]] && missing_deps+="\n    ${all_deps[i]}"
     done
 
     [[ ${#missing_deps} -gt 0 ]] \
