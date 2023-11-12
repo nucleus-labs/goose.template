@@ -128,7 +128,7 @@ function add_flag () {
 
     # register information
     [[ "${flag}" != "-" ]] && valid_flags["${flag}"]="${name}"
-    
+
     # description="${description//\${/\\\${}"
 
     local packed="'${flag}' '${name}' '${description//\'/\\\'}' '${priority}' '${argument}' '${argument_type}' '${arg_description//\'/\\\'}'"
@@ -277,10 +277,10 @@ function scrub_flags () {
     local FORCE="$1"
 
     unset -v flag_schedule flag_unschedule
-    
+
     declare -ga flag_schedule
     declare -ga flag_unschedule
-    
+
     if [[ ${PRESERVE_FLAGS} -eq 0 || x"${FORCE}" == x"force" ]]; then
         unset -v valid_flags valid_flag_names
 
@@ -305,7 +305,7 @@ function validate_target () {
     [[ "$(is_builtin ${target})" == "n" ]] \
         && source "targets/${target}.bash" \
         || eval "target_${target}_builtin"
-    
+
     validate_flags
     execute_flags
 
@@ -319,7 +319,7 @@ function validate_target () {
 
         [[ ${#arguments[@]} -eq 0 ]] && \
             error $(eval echo "${ERR_INFO}") "Target '${target}' requires argument '${arg_name}' but wasn't provided!" 255
-        
+
         local arg="${arguments[0]}"
         arr_pop arguments 0
 
@@ -404,7 +404,7 @@ function print_help () {
                 echo ";name;priority;argument name;argument type   ;description"
                 echo ";;;;;"
                 for flag_name in "${!valid_flag_names[@]}"; do
-                
+
                     # echo "${flag_name}"
                     local packed_flag_data="${valid_flag_names[${flag_name}]}"
                     # echo "${packed_flag_data}"
@@ -434,7 +434,7 @@ function print_help () {
                         --table-columns "short name,long name,priority,argument name,argument type,description"     \
                         --table-right "short name,priority"                                                         \
                         --table-wrap description
-            
+
             {
                 echo "target: ${current_target};description:;${description}"
                 echo ";;"
@@ -450,12 +450,13 @@ function print_help () {
                     --output-width ${cols}                  \
                     --table-noheadings                      \
                     --table-columns "argument name,argument type,description"  \
-                    --table-wrap description 
+                    --table-wrap description
 
         else
             local current_target="${flag_help}"
-            
+
             scrub_flags
+            description=""
             source "targets/${current_target}.bash"
 
             local arg_count=${#target_arguments[@]}
@@ -475,7 +476,7 @@ function print_help () {
                     --output-width ${cols}                  \
                     --table-noheadings                      \
                     --table-columns "argument name,argument type,description"  \
-                    --table-wrap description 
+                    --table-wrap description
 
             printf "%${cols}s\n" | tr " " "="
 
@@ -483,7 +484,7 @@ function print_help () {
                 echo ";name;priority;argument name;argument type   ;description"
                 echo ";;;;;"
                 for flag_name in "${!valid_flag_names[@]}"; do
-                
+
                     # echo "${flag_name}"
                     local packed_flag_data="${valid_flag_names[${flag_name}]}"
                     # echo "${packed_flag_data}"
@@ -534,7 +535,7 @@ function print_help () {
             echo ";name;priority;argument name;argument type   ;description"
             echo ";;;;;"
             for flag_name in "${!valid_flag_names[@]}"; do
-            
+
                 # echo "${flag_name}"
                 local packed_flag_data="${valid_flag_names[${flag_name}]}"
                 # echo "${packed_flag_data}"
@@ -564,7 +565,7 @@ function print_help () {
                     --table-columns "short name,long name,priority,argument name,argument type,description"     \
                     --table-right "short name,priority"                                                         \
                     --table-wrap description
-        
+
         echo "Targets:"
         {
             echo ";;;"
@@ -575,12 +576,13 @@ function print_help () {
                 [[ "${current_target}" == "common" ]] && continue
 
                 # echo "${current_target}" >&2
-                
+
                 target_arguments=()
                 target_arg_types=()
                 target_arg_descs=()
 
                 scrub_flags "force"
+                description=""
                 source ${file}
 
                 local flag_count=${#valid_flag_names[@]}
@@ -594,7 +596,7 @@ function print_help () {
                 --table                                                         \
                 --output-width ${cols}                                          \
                 --table-columns "subcommand,flag count,arg count,description"   \
-                --table-wrap description 
+                --table-wrap description
     fi
 }
 
