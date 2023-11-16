@@ -22,22 +22,21 @@ source targets/common.bash
 function init () {
     [[ ! -f .env ]] && echo -e "\n\n\n" > .env
     source .env
-    export DOCKER_BUILDKIT=1
 }
 
 function cleanup () {
-    [[ ${created_container} -eq 1 && ${persist} -eq 0 ]] && docker rm -v ${container_id} 2>&1 >/dev/null
+    return
 }
 
 # ================================================================================================
 #                                               MAIN
 function main () {
-    validate_dependencies
     init
 
     validate_flags
     execute_flags
 
+    [[ ${IGNORE_DEPENDENCIES} -eq 0 ]] && validate_dependencies
     validate_target
 
     cleanup
