@@ -120,3 +120,35 @@ This is a unique target that is ignored by target validation and is specifically
 If a `.env` file does not exist when you run dhelper, it will be created. This will overwrite variable values from `arg_parse.bash` and `targets/common.bash`. Command-line flags will overwrite values defined in the `.env`. The precedent is as such: <br />
 `arg_parse.bash` -> `targets/common.bash` -> `.env` -> `command-line flags`
 
+### variadic target arguments
+When providing a type for a target argument, the inclusion of an elipses (`...`) indicates that all following arguments (while being parsed) belong to this variable and are of this type. As such, they will be typechecked as such.
+
+`targets/dummy-types.bash`:
+```bash
+add_argument "dummy1" "int"      "a dummy int"
+add_argument "dummy2" "string"   "a dummy string"
+add_argument "dummy3" "float..." "a dummy float"
+
+function target_dummy_types () {
+    echo "dummy1: $1"
+    echo "dummy2: $2"
+
+    shift 2 # discard the first 2 arguments
+
+    # `$*` grabs all arguments passed to function, which is why you need to discard the first 2
+    local dummy3=($*)
+    IFS=','
+    echo "dummy3: (${dummy3[*]})"
+    unset IFS
+}
+```
+usage:<br/>
+`./dhelper dummy-types 5 "hello" 1.0 2.5 900.1`
+
+output:
+```
+dummy1: 5
+dummy2: hello
+dummy3: (1.0,2.5,900.1)
+```
+
