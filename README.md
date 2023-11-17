@@ -121,7 +121,11 @@ If a `.env` file does not exist when you run dhelper, it will be created. This w
 `arg_parse.bash` -> `targets/common.bash` -> `.env` -> `command-line flags`
 
 ### variadic target arguments
-When providing a type for a target argument, the inclusion of an elipses (`...`) indicates that all following arguments (while being parsed) belong to this variable and are of this type. As such, they will be typechecked as such.
+When providing a type for a target argument, the inclusion of an elipses (`...`) indicates that all following arguments (while being parsed) belong to this variable and are of this type, and they will be typechecked as such.
+
+If you don't want typechecking on them, put them in a new argument with the `any...` type.
+
+***variadic argument types MUST be the final argument of a target***, otherwise it will always fail, citing unprovided argument
 
 `targets/dummy-types.bash`:
 ```bash
