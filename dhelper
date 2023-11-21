@@ -11,6 +11,12 @@
 }
 source .dhelper_src/arg_parse.bash
 
+[[ ! -f ".dhelper_src/dep_tree_build.bash" ]] && {
+    echo "'.dhelper_src/dep_tree_build.bash' is missing! Critical dependency! Exiting..." >&2
+    exit 255
+}
+source .dhelper_src/dep_tree_build.bash
+
 [[ ! -d "targets/" ]] && {
     echo "no target directory! Nothing to run! Exiting..." >&2
     exit 255
@@ -44,6 +50,7 @@ function main () {
 
     cleanup
 }
+
 
 main
 
