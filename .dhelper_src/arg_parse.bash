@@ -1,7 +1,23 @@
-#!/usr/bin/env bash
+
+function preexec () {
+    echo "About to call '$1'" >&2
+}
+
+[[ ! -f ".dhelper_src/bash-preexec.bash" ]] && {
+    echo "'.dhelper_src/bash-preexec.bash' is missing! Critical dependency! Fetching..." >&2
+    curl https://raw.githubusercontent.com/rcaloras/bash-preexec/master/bash-preexec.sh -o .dhelper_src/bash-preexec.bash >&2
+}
+source .dhelper_src/bash-preexec.bash
+# trap 'preexec' DEBUG
+
+# for cmd in "${PROMPT_COMMAND[@]}"; do
+#     eval "${cmd}"
+# done
+# exit
 
 # ================================================================================================
 #                                            GLOBALS
+SNAME=$0
 
 declare -A valid_flags
 declare -A valid_flag_names
@@ -12,6 +28,9 @@ declare -a flag_unschedule
 declare -a arguments
 arguments+=($*)
 
+declare -ga target_stack
+declare -a function_trace
+
 declare -a builtin_targets
 
 valid_arg_types=("any" "int" "float" "string")
@@ -20,56 +39,113 @@ BUILTIN_DEPENDENCIES=("tput")
 IGNORE_DEPENDENCIES=0
 PRESERVE_FLAGS=0
 
+
 # ================================================================================================
 #                                              UTILS
-ERR_INFO="\${BASH_SOURCE[0]} \${LINENO}"
-# (1: file; 2: line number; 3: error message; 4: exit code)
+ERR_INFO='$(caller) ${BASH_SOURCE[0]} ${LINENO}'
+# echo $(eval echo "${ERR_INFO}")
+# exit
+# (1: caller line number; 2: caller file; 3: file; 4: line number; 5: error message; 6: exit code)
 function error () {
-    local file="$1"
-    local line_number="$2"
-    local message="$3"
-    local code="${4:-1}"
+    local caller_linenum="$1"
+    local caller_file="$2"
+    local file="$3"
+    local line_number="$4"
+    local message="$5"
+    local code="$6"
+    echo "[${caller_file}:${caller_linenum}]"
     [[ -n "$message" ]] && echo -e "[ERROR][${file}:${line_number}][${code}]: ${message}" || echo "[ERROR][${file}][${line_number}][${code}]"
     exit ${code}
 }
 
-# (1: array name (global); 2: array type (-a/-A))
+# (1: array name (global))
 function arr_max_value () {
-    [[ -z "$1" ]]           && caller >&2 && error $(eval echo "${ERR_INFO}") "Array name is empty!" 80
+    [[ -z "$1" ]]           && error $(eval echo "${ERR_INFO}") "Array name is empty!" 80
     local arr_declare="$(declare -p "$1" 2>/dev/null)"
     [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]                                            \
-                            && caller >&2 && error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist!" 81
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist!" 81
     [[ ! -v "$1"    || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]    \
-                            && caller >&2 && error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 82
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 82
     local -n arr="$1"
     local max_value=${arr[0]}
 
     for item in "${arr[@]}"; do
-        [[ ! $2 =~ ^[0-9]+$ ]]  && caller >&2 && error $(eval echo "${ERR_INFO}") "value '$2' is not a valid number!" 83
+        [[ ! $2 =~ ^-?[0-9]+$ ]]  && error $(eval echo "${ERR_INFO}") "value '$2' is not a valid number!" 83
         max_value=$(( ${item} > ${max_value} ? ${item} : ${max_value} ))
     done
     echo ${max_value}
 }
 
-# (1: array name (global); 2: index to pop; 3: array type (-a/-A))
+# (1: array name (global); 2: index to pop)
 function arr_pop () {
-    [[ -z "$1" ]] && caller >&2 && error $(eval echo "${ERR_INFO}") "Array name is empty!" 90
+    [[ -z "$1" ]] && error $(eval echo "${ERR_INFO}") "Array name is empty!" 90
 
     local arr_declare="$(declare -p "$1" 2>/dev/null)"
 
     [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]] && \
-        caller >&2 && error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist or is empty!" 91
+        error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist or is empty!" 91
 
     [[ ! -v "$1"    || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]] && \
-        caller >&2 && error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 92
+        error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 92
 
     [[ ! $2 =~ ^[0-9]+$ ]]  && \
-        caller >&2 && error $(eval echo "${ERR_INFO}") "Index '$2' is not a valid number!" 93
+        error $(eval echo "${ERR_INFO}") "Index '$2' is not a valid number!" 93
 
     [[ ! -v $1[$2] ]]       && \
-        caller >&2 && error $(eval echo "${ERR_INFO}") "Array element at index $2 does not exist!" 94
+        error $(eval echo "${ERR_INFO}") "Array element at index $2 does not exist!" 94
 
     eval "$1=(\${$1[@]:0:$2} \${$1[@]:$2+1})"
+}
+
+# (1: array name (global); 2: value to push)
+function buffer_push () {
+    [[ x"$1" == x"" ]]      && error $(eval echo "${ERR_INFO}") "Array name is empty!" 80
+    local arr_declare="$(declare -p "$1" 2>/dev/null)"
+    [[ "${arr_declare}" != "declare"* ]]                                            \
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist!" 81
+    [[ "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]    \
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 82
+
+    local buffer=($(eval "echo $1[@]"))
+    eval "$1=($2 ${buffer[@]})"
+}
+
+function stack_pop () {
+    [[ -z "$1" ]]           && error $(eval echo "${ERR_INFO}") "Array name is empty!" 80
+    local arr_declare="$(declare -p "$1" 2>/dev/null)"
+    [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]                                            \
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist!" 81
+    [[ ! -v "$1"    || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]    \
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 82
+
+    local pop_val=$(eval "$1[0]")
+    arr_pop $1 0
+    echo "${pop_val}"
+}
+
+function queue_pop () {
+    [[ -z "$1" ]]           && error $(eval echo "${ERR_INFO}") "Array name is empty!" 80
+    local arr_declare="$(declare -p "$1" 2>/dev/null)"
+    [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]                                            \
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' does not exist!" 81
+    [[ ! -v "$1"    || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]    \
+                            && error $(eval echo "${ERR_INFO}") "Variable '$1' is not an array!" 82
+
+    local buffer=($(eval "$1[@]"))
+    local buffer_len=$(( ${#buffer[@]} - 1 ))
+    local pop_val="${buffer[buffer_len]}"
+    arr_pop $1 ${buffer_len}
+    echo "${pop_val}"
+}
+
+function require () {
+    which "$1" &> /dev/null || {
+        error $(eval echo "${ERR_INFO}") "Requirement '$1' is not found" 255
+    }
+}
+
+function print_stack_trace () {
+    return
 }
 
 # ================================================================================================
@@ -79,9 +155,8 @@ function validate_dependencies () {
     local missing_deps=""
 
     for (( i=0; i<${#all_deps[@]}; i++ )); do
-        which "${all_deps[i]}" &> /dev/null
-        local _ret=$?
-        [[ ${_ret} -ne 0 ]] && missing_deps+="\n    ${all_deps[i]}"
+        which "${all_deps[i]}" &> /dev/null \
+            || missing_deps+="\n    ${all_deps[i]}"
     done
 
     [[ ${#missing_deps} -gt 0 ]] \
@@ -101,30 +176,28 @@ function add_flag () {
     local arg_description="$7"
 
     # basic validations
-    [[ x"${flag}" == x"" ]]             && caller >&2 && error $(eval echo "${ERR_INFO}") "Flag cannot be empty!"                                           60
-    [[ ${#flag} -gt 1 ]]                && caller >&2 && error $(eval echo "${ERR_INFO}") "Flag '${flag}' is invalid! Flags must be a single character!"    61
-    [[ x"${description}" == x"" ]]      && caller >&2 && error $(eval echo "${ERR_INFO}") "Description for flag '${name}' cannot be empty!"                 62
-    [[ x"${priority}" == x"" ]]         && caller >&2 && error $(eval echo "${ERR_INFO}") "Must provide a priority for flag '${name}'!"                     63
-    [[ ! ${priority} =~ ^[0-9]+$ ]]     && caller >&2 && error $(eval echo "${ERR_INFO}") "Priority <${priority}> for flag '${name}' is not a number!"      64
-    [[ x"${argument}" != x"" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]] && {
-        caller >&2
-        error $(eval echo "${ERR_INFO}") "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!" 65
-    }
+    [[ x"${flag}" == x"" ]]             && error $(eval echo "${ERR_INFO}") "Flag cannot be empty!"                                           60
+    [[ ${#flag} -gt 1 ]]                && error $(eval echo "${ERR_INFO}") "Flag '${flag}' is invalid! Flags must be a single character!"    61
+    [[ x"${description}" == x"" ]]      && error $(eval echo "${ERR_INFO}") "Description for flag '${name}' cannot be empty!"                 62
+    [[ x"${priority}" == x"" ]]         && error $(eval echo "${ERR_INFO}") "Must provide a priority for flag '${name}'!"                     63
+    [[ ! ${priority} =~ ^-?[0-9]+$ ]]   && error $(eval echo "${ERR_INFO}") "Priority <${priority}> for flag '${name}' is not a number!"      64
+    [[ x"${argument}" != x"" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]] \
+        && error $(eval echo "${ERR_INFO}") "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!" 65
 
     # TODO: illegal key detection ( ' ; )
 
     # more complex validations
     for key in "${!valid_flags[@]}"; do # iterate over keys
-        [[ "${valid_flags[${key}]}" == "${flag}" ]]             && caller >&2 && error $(eval echo "${ERR_INFO}") "Flag <${flag}> already registered!"                      66
+        [[ "${valid_flags[${key}]}" == "${flag}" ]]             && error $(eval echo "${ERR_INFO}") "Flag <${flag}> already registered!"                      66
     done
 
     for flag_name in "${!valid_flag_names[@]}"; do
-        [[ "${valid_flag_names[${flag_name}]}" == "${name}" ]]  && caller >&2 && error $(eval echo "${ERR_INFO}") "Flag name <${flag_name}> already registered!"            67
+        [[ "${valid_flag_names[${flag_name}]}" == "${name}" ]]  && error $(eval echo "${ERR_INFO}") "Flag name <${flag_name}> already registered!"            67
     done
 
     [[ x"${argument}" != x"" ]] && {
-        [[ x"${argument_type}" == x"" ]]    && caller >&2 && error $(eval echo "${ERR_INFO}") "Argument type must be provided for flag '${name}':'${argument}'"             68
-        [[ x"${arg_description}" == x"" ]]  && caller >&2 && error $(eval echo "${ERR_INFO}") "Argument description must be provided for flag '${name}':'${argument}'"      69
+        [[ x"${argument_type}" == x"" ]]    && error $(eval echo "${ERR_INFO}") "Argument type must be provided for flag '${name}':'${argument}'"             68
+        [[ x"${arg_description}" == x"" ]]  && error $(eval echo "${ERR_INFO}") "Argument description must be provided for flag '${name}':'${argument}'"      69
     }
 
     # register information
@@ -142,7 +215,7 @@ function check_type () {
 
     local inferred_type
 
-    if   [[ "${arg}" =~ ^[0-9]+$ ]]; then
+    if   [[ "${arg}" =~ ^-?[0-9]+$ ]]; then
         inferred_type="int"
     elif [[ "${arg}" =~ ^[+-]?[0-9]+\.?[0-9]*$ ]]; then
         inferred_type="float"
@@ -182,7 +255,6 @@ function validate_flag () {
         #  4: argument name; 5: argument type; 6: argument description
         local flag_arg
         [[ x"${unpacked_flag_data[4]}" != x"" ]] && {
-            # [[ x"${arguments[0]}" == x"" ]]
             flag_arg=" ${arguments[0]}"
             arr_pop arguments 0
 
@@ -262,16 +334,23 @@ function validate_flags () {
 }
 
 function execute_flags () {
-    for (( i=0; i<10; i++ )); do
+    for (( i=-16; i<16; i++ )); do
         for packed_item in "${flag_unschedule[@]}"; do
             eval local unpacked_item=(${packed_item})
             [[ ${unpacked_item[0]} -eq $i ]] && flag_schedule+=("${unpacked_item[1]}")
         done
     done
 
-    for (( i=0; i<${#flag_schedule[@]}; i++ )); do
-        eval ${flag_schedule[i]}
+    while [[ ${#flag_schedule[@]} -gt 0 ]]; do
+        local _cmd=${flag_schedule[0]}
+        arr_pop flag_schedule 0
+        eval ${_cmd}
     done
+
+    # IFS=';'
+    # echo "(${flag_unschedule[*]})"
+    # unset IFS
+    # exit 0
 }
 
 function scrub_flags () {
@@ -303,10 +382,13 @@ function validate_target () {
 
     scrub_flags
 
-    [[ "$(is_builtin ${target})" == "n" ]] \
-        && source "targets/${target}.bash" \
-        || eval "target_${target//-/_}_builtin"
-    
+    if [[ "$(is_builtin ${target})" == "n" ]]; then
+        buffer_push target_stack ${target}
+        source "targets/${target}.bash"
+    else
+        eval "target_${target//-/_}_builtin"
+    fi
+
     validate_flags
     execute_flags
 
@@ -646,6 +728,13 @@ function flag_name_ignore_deps () {
     IGNORE_DEPENDENCIES=1
 }
 
+add_flag "d" "debug" "enable debug mode (prints extra info)" -1
+function flag_name_debug () {
+    debug "Enabling Debug Mode"
+    debug_mode=1
+    export __bp_enable_subshells="true"
+    preexec_functions+=(trace_call)
+}
 
 builtin_targets+=("help")
 function target_help_builtin () {

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 
-[[ ! -f "arg_parse.bash" ]] && {
-    echo "arg_parse.bash is missing! Critical dependency! Exiting..." >&2
+[[ ! -d ".dhelper_src/" ]] && {
+    echo "'.dhelper_src/' is missing! Critical dependency! Exiting..." >&2
     exit 255
 }
 
-source arg_parse.bash
+[[ ! -f ".dhelper_src/arg_parse.bash" ]] && {
+    echo "'.dhelper_src/arg_parse.bash' is missing! Critical dependency! Exiting..." >&2
+    exit 255
+}
+source .dhelper_src/arg_parse.bash
 
 [[ ! -d "targets/" ]] && {
     echo "no target directory! Nothing to run! Exiting..." >&2
@@ -16,7 +20,6 @@ source arg_parse.bash
     echo "Missing common target! Critical dependency! Exiting..." >&2
     exit 255
 }
-
 source targets/common.bash
 
 function init () {
