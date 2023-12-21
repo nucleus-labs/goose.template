@@ -3,7 +3,10 @@ description="for debugging dhelper and/or the environment"
 
 PRINT_FLAGS=0
 
-# requires 'dummy:%%{test}.x'
+add_flag "h" "help" "prints this menu" 0
+function flag_name_help () {
+    print_help debug
+}
 
 add_flag "-" "print-flags" "print registered flags" 1
 function flag_name_print_flags () {
@@ -21,10 +24,10 @@ add_argument "test" "string..." "a test argument"
 function target_debug () {
     [[ ${PRINT_FLAGS} -eq 1 ]] && {
         IFS=';' echo "valid_flags: ${valid_flags[*]}"
-        IFS=';' echo "valid_flags: ${!valid_flags[*]}"
+        IFS=';' echo "!valid_flags: ${!valid_flags[*]}"
         echo
         IFS=';' echo "valid_flag_names: ${valid_flag_names[*]}"
-        IFS=';' echo "valid_flag_names: ${!valid_flag_names[*]}"
+        IFS=';' echo "!valid_flag_names: ${!valid_flag_names[*]}"
         echo
         IFS=';' echo "flag_schedule: ${flag_schedule[*]}"
         IFS=';' echo "flag_unschedule: ${flag_unschedule[*]}"

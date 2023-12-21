@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 
-[[ ! -d ".dhelper_src/" ]] && {
-    echo "'.dhelper_src/' is missing! Critical dependency! Exiting..." >&2
+[[ ! -d ".dhelper" || ! -f ".dhelper/arg_parse.bash" ]] && {
+    echo ".dhelper/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
 }
+source .dhelper/arg_parse.bash
 
-[[ ! -f ".dhelper_src/arg_parse.bash" ]] && {
-    echo "'.dhelper_src/arg_parse.bash' is missing! Critical dependency! Exiting..." >&2
+[[ ! -f ".dhelper/dag.bash" ]] && {
+    echo ".dhelper/dag.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
 }
-source .dhelper_src/arg_parse.bash
+source .dhelper/dag.bash
 
-[[ ! -f ".dhelper_src/dep_tree_build.bash" ]] && {
-    echo "'.dhelper_src/dep_tree_build.bash' is missing! Critical dependency! Exiting..." >&2
+[[ ! -f ".dhelper/test.bash" ]] && {
+    echo ".dhelper/test.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
 }
-source .dhelper_src/dep_tree_build.bash
+source .dhelper/test.bash
 
 [[ ! -d "targets/" ]] && {
     echo "no target directory! Nothing to run! Exiting..." >&2
