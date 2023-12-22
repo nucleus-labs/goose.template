@@ -1,12 +1,12 @@
 
-declare -A DAG
-declare CURRENT_TARGET
+# declare -A DAG
+# declare CURRENT_TARGET
 
-DAG["build"]="dependency1,dependency2->output1,output5 dependency3,dependency5->output2"
-DAG["run"]="dependency6"
+# DAG["build"]="dependency1,dependency2->output1,output5 dependency3,dependency5->output2"
+# DAG["run"]="dependency6"
 
 # add_argument "output-name" "string" "the filename of the generated output"
-DAG["build"]="%%{input-names}.c,%%{input-names}.h->%%{input-names}.o %%{input-names}->%{output-name}"
+# DAG["build"]="%%{input-names}.c,%%{input-names}.h->%%{input-names}.o %%{input-names}->%{output-name}"
 # %%{} is an eval that uses the environment
 # %{} is an eval that uses an argument name for the currently-scoped target
 
@@ -41,4 +41,4 @@ function export_dag () {
     echo "}" >> "${dotfile}"
 }
 
-export_dag target1 target1.dot
+# export_dag target1 target1.dot

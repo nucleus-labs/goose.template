@@ -361,12 +361,13 @@ function add_argument () {
         type_="any"
     }
 
-    [[ x"${name}" == x"" || x"${desc}" == x"" || ! ${valid_arg_types[@]} =~ "${type_}" ]] && {
-        echo "add_argument usage is: 'add_argument \"<name>\" \"<${valid_arg_types[*]}>\" \"<description>\"'" >&2
-        [[ ${detected_any} -eq 1 ]] && echo "(auto-detected type as \"any\")" >&2
-        echo "What you provided:" >&2
-        echo "add_argument \"${name}\" \"${type_}\" \"${desc}\"" >&2
-        exit 255
+    [[ x"${name}" == x"" || x"${desc}" == x"" || [[ ! ${valid_arg_types[@]} =~ "${type_}" &&  ]] ]] && {
+        local msg="\n\tadd_argument usage is: 'add_argument \"<name>\" \"<${valid_arg_types[*]}>\" \"<description>\"'\n"
+        [[ ${detected_any} -eq 1 ]] && msg+="\t(auto-detected type as \"any\")\n"
+        msg+="\tWhat you provided:\n"
+        msg+="\tadd_argument \"${name}\" \"${type_}\" \"${desc}\"\n"
+        caller >&2
+        error $(eval echo "${ERR_INFO}") "${msg}" 255
     }
 
     local count=${#target_arguments[@]}
