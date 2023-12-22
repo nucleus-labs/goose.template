@@ -139,8 +139,8 @@ function target_dummy_types () {
 
     shift 2 # discard the first 2 arguments
 
-    # `$*` grabs all arguments passed to function, which is why you need to discard the first 2
-    local dummy3=($*)
+    # `$@` grabs all arguments passed to function, which is why you need to discard the first 2
+    local dummy3=($@)
     IFS=','
     echo "dummy3: (${dummy3[*]})"
     unset IFS
