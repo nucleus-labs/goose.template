@@ -318,7 +318,7 @@ function validate_target () {
         local arg_name="${target_arguments[i]}"
         local arg_type="${target_arg_types[i]}"
 
-        if [[ "${arg_type}" != *... ]] then
+        if [[ "${arg_type}" != *... ]]; then
             [[ ${#arguments[@]} -eq 0 ]] && \
                 error $(eval echo "${ERR_INFO}") "Target '${target}' requires argument '${arg_name}' but wasn't provided!" 255
             
