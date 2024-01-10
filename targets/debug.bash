@@ -33,5 +33,5 @@ function target_debug () {
         IFS=';' echo "flag_unschedule: ${flag_unschedule[*]}"
     }
     
-    error $(eval echo "${ERR_INFO}") "I have oopsed!" 255
+    error "I have oopsed!" 255
 }

@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 
+[[ -z "${BASH}" ]] && {
+    echo "This script can only run in bash. Exiting..." >&2
+    exit 255
+}
+
 [[ ! -d ".dhelper" || ! -f ".dhelper/arg_parse.bash" ]] && {
     echo ".dhelper/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
 }
 source .dhelper/arg_parse.bash
 
-[[ ! -f ".dhelper/dag.bash" ]] && {
-    echo ".dhelper/dag.bash is missing! Critical dependency! Exiting..." >&2
-    exit 255
-}
-source .dhelper/dag.bash
+# [[ ! -f ".dhelper/dag.bash" ]] && {
+#     echo ".dhelper/dag.bash is missing! Critical dependency! Exiting..." >&2
+#     exit 255
+# }
+# source .dhelper/dag.bash
 
 [[ ! -f ".dhelper/test.bash" ]] && {
     echo ".dhelper/test.bash is missing! Critical dependency! Exiting..." >&2

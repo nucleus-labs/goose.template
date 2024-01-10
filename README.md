@@ -42,16 +42,16 @@ The 2nd group of files, `.envrc`, `flake.nix`, and `flake.lock` are provided for
 
 Flags are defined on two layers: common, and target-specific. The difference between them is that common flags are defined in `targets/common.bash` or as a builtin, and are parsed and executed before the target. Target-specific flags are defined in [target definitions](#targets). While they are defined in different locations depending on use-case, how they are defined is identical, and is as follows:
 ```bash
-add_flag "-" "jobs" "sets the number of jobs/threads to use" 1 "job count" "int" "the number of jobs/threads to use"
+add_flag "-" "jobs" "sets the number of jobs/threads to use" 1 "job count" "int"
 function flag_name_jobs () {
     JOBS=$1
-    [[ ! ${JOBS} =~ ^[0-9]+$ ]] && error $(eval echo "${ERR_INFO}") "[ERROR]: JOBS value '${JOBS}' is not a valid number!" 15
+    [[ ! ${JOBS} =~ ^[0-9]+$ ]] && error "JOBS value '${JOBS}' is not a valid integer!" 15
     debug "Using -j${JOBS}"
 }
 ```
 
 Let's break this down bit-by-bit:<br />
-`add_flag "-" "jobs" "sets the number of jobs/threads to use" 1 "job count" "int" "the number of jobs/threads to use"` <br /><br />
+`add_flag "-" "jobs" "sets the number of jobs/threads to use" 1 "job count" "int"` <br /><br />
 `add_flag` is how you register a flag. This is irrespective of registration level. The arguments are as follows:
 1. name-short           (char)
     - a single-character string that designates a short-flag alias. `-` designates a lack of short-flag alias. (`./dhelper -h` as opposed to `./dhelper --help`)
@@ -66,7 +66,7 @@ Let's break this down bit-by-bit:<br />
 6. argument-type        (string) (optional-dependent)
     - a string representing the variable's type. Valid types are (`"any" "string" "float" "int"`). `string` and `any` are identical in functionality, but `any` is intended to be an explicit "anything is accepted here". Type checking is performed on provided values that are not `any` or `string`, and will raise an error if the wrong type is provided. Providing a value for this is required if `argument-name` is provided, otherwise it is disallowed.
 7. argument-description (string) (optional-dependent)
-    - a description of what the argument does for the flag. Providing a value for this is required if `"argument-name"` is provided, otherwise it is disallowed.
+    - a description of what the argument does for the flag. Providing a value for this is optional.
 <br /><br />
 
 Next we have
@@ -156,3 +156,47 @@ dummy2: hello
 dummy3: (1.0,2.5,900.1)
 ```
 
+## Build System
+
+Dhelper can also function as a comprehensive build system! This is done completely through the use of the `transforms` function, which describes how the target *transforms* an input into an output. 
+
+Let's start with the syntax:<br/>
+`transforms "input1=>output1"`<br/>
+`transforms "input1,input2=>output2"`<br/>
+`transforms "input1,input3=>output2,output3"`<br/>
+All of these are valid ways to use `transforms`. Each one of these describes a collection of inputs that are necessary to generate the specified outputs. So if we say `transforms "input1,input3=>output2,output3"`, then in order to generate `output2`, dhelper will generate `input1` and `input3`, if those are generated.
+
+But what exactly is an input? On their own, they can only be used to specificy other targets. But you can use deferred variable expansion to get more complex behaviour!
+
+### Deferred Variable Expansion
+
+#### Quick Reference
+For a quick reference, here are the possible expansions:
+```
+%{var: self->arg1}      # target 'self' refers to the current target
+%{var: target2->arg1}   # target2's arg1 argument
+
+%{flag: self->flag1}    # target 'self' refers to the current target
+%{flag: target2->flag1} # target2's flag1 flag
+
+
+%%{var:  var_e}         # variable specifier
+%%{file: file.txt}      # file specifier
+%%{glob: src/*.c}       # glob specifier
+```
+
+#### Local Variable Expansion
+
+Let's start simple, with "local" variable expansions. These describe evaluations of values described by a target. Currently, this only includes target arguments. So you may have a target that looks like the following:
+
+```bash
+description "generates the executable"
+
+transforms "%{flag: this->backend}=>my-exe"
+
+add_flag '-' "backend" "the backend to use" 0 "backend" "string"
+
+function target_build () {
+    ${CC} ...
+}
+```
