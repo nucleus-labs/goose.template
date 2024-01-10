@@ -310,8 +310,10 @@ function validate_target () {
     local target=${arguments[0]}
     local valid_target_found=0
 
-    [[ ${#arguments[@]} -eq 0 ]] && print_help
-
+    if [[ ${#arguments[@]} -eq 0 ]]; then
+        print_help
+        exit 0
+    fi
     arr_pop arguments 0
 
     if [[ ! -f "targets/${target}.bash" && "$(is_builtin ${target})" == "n" ]]; then
@@ -663,7 +665,7 @@ function flag_name_help_target () {
     exit 0
 }
 
-add_flag "-" "debug--ignore-dependencies" "bypass the check for dependencies"
+add_flag "-" "debug--ignore-dependencies" "bypass the check for dependencies" 0
 function flag_name_debug__ignore_dependencies () {
     IGNORE_DEPENDENCIES=1
 }
