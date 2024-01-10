@@ -1,37 +1,33 @@
 #!/usr/bin/env bash
 
-[[ -z "${BASH}" ]] && {
+if [[ -z "${BASH}" ]]; then
     echo "This script can only run in bash. Exiting..." >&2
     exit 255
-}
+fi
 
-[[ ! -d ".dhelper" || ! -f ".dhelper/arg_parse.bash" ]] && {
+if [[ ! -d ".dhelper" || ! -f ".dhelper/arg_parse.bash" ]]; then
     echo ".dhelper/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
-}
+fi
 source .dhelper/arg_parse.bash
 
-# [[ ! -f ".dhelper/dag.bash" ]] && {
-#     echo ".dhelper/dag.bash is missing! Critical dependency! Exiting..." >&2
-#     exit 255
-# }
+# if [[ ! -f ".dhelper/dag.bash" ]]; then
+#     error ".dhelper/dag.bash is missing! Critical dependency! Exiting..." 255
+# fi
 # source .dhelper/dag.bash
 
-[[ ! -f ".dhelper/test.bash" ]] && {
-    echo ".dhelper/test.bash is missing! Critical dependency! Exiting..." >&2
-    exit 255
-}
-source .dhelper/test.bash
+# if [[ ! -f ".dhelper/test.bash" ]]; then
+#     error ".dhelper/test.bash is missing! Critical dependency! Exiting..." 255
+# fi
+# source .dhelper/test.bash
 
-[[ ! -d "targets/" ]] && {
-    echo "no target directory! Nothing to run! Exiting..." >&2
-    exit 255
-}
+if [[ ! -d "targets/" ]]; then
+    error "no target directory! Nothing to run! Exiting..." 255
+fi
 
-[[ ! -f "targets/common.bash" ]] && {
-    echo "Missing common target! Critical dependency! Exiting..." >&2
-    exit 255
-}
+if [[ ! -f "targets/common.bash" ]]; then
+    error "Missing common target! Critical dependency! Exiting..." 255
+fi
 source targets/common.bash
 
 function init () {
