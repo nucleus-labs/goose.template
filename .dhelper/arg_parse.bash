@@ -95,17 +95,17 @@ function arr_pop () {
 #                                       CORE FUNCTIONALITY
 function validate_dependencies () {
     local all_deps=(${BUILTIN_DEPENDENCIES[@]} ${DEPENDENCIES[@]})
-    local missing_deps=""
+    local -a missing_deps
 
     for (( i=0; i<${#all_deps[@]}; i++ )); do
         which "${all_deps[i]}" &> /dev/null
         local _ret=$?
-        [[ ${_ret} -ne 0 ]] && missing_deps+="\n    ${missing_deps[i]}"
+        [[ ${_ret} -ne 0 ]] && missing_deps+=("\n\t${all_deps[i]}")
     done
 
-    [[ ${#missing_deps} -gt 0 ]] \
-        && error "Please install missing dependencies:${missing_deps}\n" 255
-
+    if [[ ${#missing_deps} -ne 0 ]]; then
+        error "Please install missing dependencies:${missing_deps[*]}\n" 255
+    fi
 }
 
 #  1: flag (single character); 2: name; 3: description; 4: priority;
