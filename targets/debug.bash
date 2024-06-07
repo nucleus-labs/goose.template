@@ -3,11 +3,6 @@ description="for debugging dhelper and/or the environment"
 
 PRINT_FLAGS=0
 
-add_flag "h" "help" "prints this menu" 0
-function flag_name_help () {
-    print_help debug
-}
-
 add_flag "-" "print-flags" "print registered flags" 1
 function flag_name_print_flags () {
     PRINT_FLAGS=1
@@ -32,6 +27,6 @@ function target_debug () {
         IFS=';' echo "flag_schedule: ${flag_schedule[*]}"
         IFS=';' echo "flag_unschedule: ${flag_unschedule[*]}"
     }
-    
+
     error "I have oopsed!" 255
 }

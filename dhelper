@@ -1,34 +1,51 @@
 #!/usr/bin/env bash
 
-if [[ -z "${BASH}" ]]; then
+if [ -z "${BASH}" ]; then
     echo "This script can only run in bash. Exiting..." >&2
     exit 255
 fi
 
-if [[ ! -d ".dhelper" || ! -f ".dhelper/arg_parse.bash" ]]; then
-    echo ".dhelper/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
+declare -g DHELPER_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+declare -g DHELPER_NAME="${0##${DHELPER_PATH}/}"
+declare -g PROJECT_PATH=$(pwd)
+
+if [[ "${DHELPER_PATH}" != "${PROJECT_PATH}" && ! -f "${PROJECT_PATH}/${DHELPER_NAME}" ]]; then
+    PROJECT_PATH="${DHELPER_PATH}"
+fi
+
+if [[ "${DHELPER_PATH}" != "${PROJECT_PATH}" && "$1" == "-g" ]]; then
+    echo "Using external dhelper..."
+    shift
+elif [[ "${DHELPER_PATH}" != "${PROJECT_PATH}" && -f "${PROJECT_PATH}/${DHELPER_NAME}" ]]; then
+    echo "Using local dhelper..."
+    ${PROJECT_PATH}/${DHELPER_NAME} $@
+    exit $?
+fi
+
+if [[ ! -d "${DHELPER_PATH}/.dhelper" || ! -f "${DHELPER_PATH}/.dhelper/arg_parse.bash" ]]; then
+    echo "${PROJECT_PATH}/.dhelper/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
 fi
-source .dhelper/arg_parse.bash
+source ${DHELPER_PATH}/.dhelper/arg_parse.bash
 
-# if [[ ! -f ".dhelper/dag.bash" ]]; then
-#     error ".dhelper/dag.bash is missing! Critical dependency! Exiting..." 255
+# if [[ ! -f "${DHELPER_PATH}/.dhelper/dag.bash" ]]; then
+#     error "${DHELPER_PATH}/.dhelper/dag.bash is missing! Critical dependency! Exiting..." 255
 # fi
 # source .dhelper/dag.bash
 
-# if [[ ! -f ".dhelper/test.bash" ]]; then
-#     error ".dhelper/test.bash is missing! Critical dependency! Exiting..." 255
+# if [[ ! -f "${DHELPER_PATH}/.dhelper/test.bash" ]]; then
+#     error "${DHELPER_PATH}.dhelper/test.bash is missing! Critical dependency! Exiting..." 255
 # fi
-# source .dhelper/test.bash
+# source $(.dhelper/test.bash
 
-if [[ ! -d "targets/" ]]; then
+if [[ ! -d "${PROJECT_PATH}/targets/" ]]; then
     error "no target directory! Nothing to run! Exiting..." 255
 fi
 
-if [[ ! -f "targets/common.bash" ]]; then
+if [[ ! -f "${PROJECT_PATH}/targets/common.bash" ]]; then
     error "Missing common target! Critical dependency! Exiting..." 255
 fi
-source targets/common.bash
+source ${PROJECT_PATH}/targets/common.bash
 
 function init () {
     [[ ! -f .env ]] && echo -e "\n\n\n" > .env
@@ -55,4 +72,3 @@ function main () {
 
 
 main
-

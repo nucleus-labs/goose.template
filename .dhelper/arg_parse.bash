@@ -120,13 +120,12 @@ function add_flag () {
     local arg_description="$7"
 
     # basic validations
-    [[ x"${flag}" == x"" ]]             && error "Flag cannot be empty!"                                           60
+    [[ -z "${flag}" ]]                  && error "Flag cannot be empty!"                                           60
     [[ ${#flag} -gt 1 ]]                && error "Flag '${flag}' is invalid! Flags must be a single character!"    61
-    [[ x"${description}" == x"" ]]      && error "Description for flag '${name}' cannot be empty!"                 62
-    [[ x"${priority}" == x"" ]]         && error "Must provide a priority for flag '${name}'!"                     63
+    [[ -z "${description}" ]]           && error "Description for flag '${name}' cannot be empty!"                 62
+    [[ -z "${priority}" ]]              && error "Must provide a priority for flag '${name}'!"                     63
     [[ ! ${priority} =~ ^[0-9]+$ ]]     && error "Priority <${priority}> for flag '${name}' is not a number!"      64
-    if [[ x"${argument}" != x"" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]]; then
-        caller >&2
+    if [[ -n "${argument}" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]]; then
         error "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!" 65
     fi
 
@@ -294,10 +293,10 @@ function scrub_flags () {
     local FORCE="$1"
 
     unset -v flag_schedule flag_unschedule
-    
+
     declare -ga flag_schedule
     declare -ga flag_unschedule
-    
+
     if [[ ${PRESERVE_FLAGS} -eq 0 || x"${FORCE}" == x"force" ]]; then
         unset -v valid_flags valid_flag_names
 
@@ -316,16 +315,16 @@ function validate_target () {
     fi
     arr_pop arguments 0
 
-    if [[ ! -f "targets/${target}.bash" && "$(is_builtin ${target})" == "n" ]]; then
-        error "Target file 'targets/${target}.bash' not found!" 255
+    if [[ ! -f "${PROJECT_PATH}/targets/${target}.bash" && "$(is_builtin ${target})" == "n" ]]; then
+        error "Target file '${PROJECT_PATH}/targets/${target}.bash' not found!" 255
     fi
 
     DAG_TARGET_STACK+=("${target}")
-    
+
     scrub_flags
 
     if [[ "$(is_builtin ${target})" == "n" ]]; then
-        source "targets/${target}.bash"
+        source "${PROJECT_PATH}/targets/${target}.bash"
     else
         eval "target_${target}_builtin"
     fi
@@ -333,7 +332,7 @@ function validate_target () {
     target="${target//-/_}"
 
     if [[ $(type -t "target_${target}") != "function" ]]; then
-        error "Target function 'target_${target}' was not found in 'targets/${target}.bash'!" 255
+        error "Target function 'target_${target}' was not found in '${PROJECT_PATH}/targets/${target}.bash'!" 255
     fi
 
     validate_flags
@@ -349,9 +348,10 @@ function validate_target () {
         arg_type=${arg_type%%...}
 
         if [[ ${variadic} -eq 0 ]]; then
-            [[ ${#arguments[@]} -eq 0 ]] && \
+            if [[ ${#arguments[@]} -eq 0 ]]; then
                 error "Target '${target}' requires argument '${arg_name}' but wasn't provided!" 255
-            
+            fi
+
             local arg="${arguments[0]}"
             arr_pop arguments 0
 
@@ -406,15 +406,14 @@ function add_argument () {
     fi
 
     local variadic=0
-    [[ x"${type_}" == x*... ]] && variadic=1
+    [[ "${type_}" == *... ]] && variadic=1
     type_="${type_%%...}"
 
-    if [[ x"${name}" == x"" || x"${desc}" == x"" || ! ${valid_arg_types[@]} =~ "${type_}" ]]; then
+    if [[ "${name}" == "" || "${desc}" == "" || ! ${valid_arg_types[@]} =~ "${type_}" ]]; then
         local msg="\n\tadd_argument usage is: 'add_argument \"<name>\" \"<${valid_arg_types[*]}>\" \"<description>\"'\n"
         [[ ${detected_any} -eq 1 ]] && msg+="\t(auto-detected type as \"any\")\n"
         msg+="\tWhat you provided:\n"
         msg+="\tadd_argument \"${name}\" \"${type_}\" \"${desc}\"\n"
-        caller >&2
         error "${msg}" 255
     fi
 
@@ -455,10 +454,8 @@ function print_help () {
                 echo ";name;priority;argument name;argument type   ;description"
                 echo ";;;;;"
                 for flag_name in "${!valid_flag_names[@]}"; do
-                
-                    # echo "${flag_name}"
+
                     local packed_flag_data="${valid_flag_names[${flag_name}]}"
-                    # echo "${packed_flag_data}"
                     eval local flag_data=(${packed_flag_data})
 
                     #  1: flag (single character); 2: name; 3: description; 4: priority;
@@ -485,7 +482,7 @@ function print_help () {
                         --table-columns "short name,long name,priority,argument name,argument type,description"     \
                         --table-right "short name,priority"                                                         \
                         --table-wrap description
-            
+
             {
                 echo "target: ${current_target};description:;${description}"
                 echo ";;"
@@ -505,7 +502,7 @@ function print_help () {
 
         else
             local current_target="${flag_help}"
-            
+
             scrub_flags
             source "targets/${current_target}.bash"
 
@@ -534,7 +531,7 @@ function print_help () {
                 echo ";name;priority;argument name;argument type   ;description"
                 echo ";;;;;"
                 for flag_name in "${!valid_flag_names[@]}"; do
-                
+
                     # echo "${flag_name}"
                     local packed_flag_data="${valid_flag_names[${flag_name}]}"
                     # echo "${packed_flag_data}"
@@ -571,13 +568,13 @@ function print_help () {
         echo "    $0 [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]..."
         echo
         echo "Help aliases:"
-        echo "    $0"
-        echo "    $0  -h"
-        echo "    $0 --help"
-        echo "    $0   help"
+        echo "    ${DHELPER_NAME}"
+        echo "    ${DHELPER_NAME}  -h"
+        echo "    ${DHELPER_NAME} --help"
+        echo "    ${DHELPER_NAME}   help"
         echo
         echo "More detailed help aliases:"
-        echo "    $0 --help-target <target>"
+        echo "    ${DHELPER_NAME} --help-target <target>"
         echo
 
         echo "Common Flags:"
@@ -585,7 +582,7 @@ function print_help () {
             echo ";name;priority;argument name;argument type   ;description"
             echo ";;;;;"
             for flag_name in "${!valid_flag_names[@]}"; do
-            
+
                 # echo "${flag_name}"
                 local packed_flag_data="${valid_flag_names[${flag_name}]}"
                 # echo "${packed_flag_data}"
@@ -615,18 +612,18 @@ function print_help () {
                     --table-columns "short name,long name,priority,argument name,argument type,description"     \
                     --table-right "short name,priority"                                                         \
                     --table-wrap description
-        
+
         echo "Targets:"
         {
             echo ";;;"
-            for file in targets/*.bash; do
+            for file in ${PROJECT_PATH}/targets/*.bash; do
                 current_target="${file##*/}"
                 current_target="${current_target%.bash}"
 
                 [[ "${current_target}" == "common" ]] && continue
 
                 # echo "${current_target}" >&2
-                
+
                 target_arguments=()
                 target_arg_types=()
                 target_arg_descs=()
@@ -645,7 +642,7 @@ function print_help () {
                 --table                                                         \
                 --output-width ${cols}                                          \
                 --table-columns "subcommand,flag count,arg count,description"   \
-                --table-wrap description 
+                --table-wrap description
     fi
 }
 
