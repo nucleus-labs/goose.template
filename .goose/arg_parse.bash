@@ -570,16 +570,16 @@ function print_help () {
         fi
     else # iterate through targets and collect info ; `$0 -h` or `$0 --help`
         echo "Main usage:"
-        echo "    ${DHELPER_NAME} [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]..."
+        echo "    ${APP_NAME} [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]..."
         echo
         echo "Help aliases:"
-        echo "    ${DHELPER_NAME}"
-        echo "    ${DHELPER_NAME}  -h"
-        echo "    ${DHELPER_NAME} --help"
-        echo "    ${DHELPER_NAME}   help"
+        echo "    ${APP_NAME}"
+        echo "    ${APP_NAME}  -h"
+        echo "    ${APP_NAME} --help"
+        echo "    ${APP_NAME}   help"
         echo
         echo "More detailed help aliases:"
-        echo "    ${DHELPER_NAME} --help-target <target>"
+        echo "    ${APP_NAME} --help-target <target>"
         echo
 
         echo "Common Flags:"
@@ -683,19 +683,19 @@ function flag_name_error () {
     return $1
 }
 
-add_flag 'g' "global" "use the global install of ${DHELPER_NAME}" 0
+add_flag 'g' "global" "use the global install of ${APP_NAME}" 0
 function flag_name_global () {
     echo ${readonly_arguments}
 }
 
-function dhelper_autocomplete () {
+function goose_autocomplete () {
     echo > /dev/null
     # TODO: add pseudo-parsing of supplied arguments so that suggestions can be made
 }
 
-add_flag '-' "register-autocompletion" "use this flag to enable autocompletion of ${DHELPER_NAME}" 0
+add_flag '-' "register-autocompletion" "use this flag to enable autocompletion of ${APP_NAME}" 0
 function flag_name_register_autocompletion () {
-    complete -F dhelper_autocomplete ${DHELPER_NAME}
+    complete -F goose_autocomplete ${APP_NAME}
     exit 0
 }
 
