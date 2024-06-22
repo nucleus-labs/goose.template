@@ -7,7 +7,9 @@ fi
 
 declare -g DHELPER_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 declare -g DHELPER_NAME="${0##${DHELPER_PATH}/}"
-declare -g PROJECT_PATH=$(pwd)
+declare -g PROJECT_PATH="$(pwd)"
+
+[[ "${DHELPER_PATH}" == "${PROJECT_PATH}" && "$1" == "-g" ]] && shift
 
 if [[ "${DHELPER_PATH}" != "${PROJECT_PATH}" && ! -f "${PROJECT_PATH}/${DHELPER_NAME}" ]]; then
     PROJECT_PATH="${DHELPER_PATH}"
@@ -16,27 +18,28 @@ fi
 if [[ "${DHELPER_PATH}" != "${PROJECT_PATH}" && "$1" == "-g" ]]; then
     echo "Using external dhelper..."
     shift
+    PROJECT_PATH="${DHELPER_PATH}"
 elif [[ "${DHELPER_PATH}" != "${PROJECT_PATH}" && -f "${PROJECT_PATH}/${DHELPER_NAME}" ]]; then
     echo "Using local dhelper..."
     ${PROJECT_PATH}/${DHELPER_NAME} $@
     exit $?
 fi
 
-if [[ ! -d "${DHELPER_PATH}/.dhelper" || ! -f "${DHELPER_PATH}/.dhelper/arg_parse.bash" ]]; then
-    echo "${PROJECT_PATH}/.dhelper/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
+if [[ ! -d "${DHELPER_PATH}/.goose" || ! -f "${DHELPER_PATH}/.goose/arg_parse.bash" ]]; then
+    echo "${PROJECT_PATH}/.goose/arg_parse.bash is missing! Critical dependency! Exiting..." >&2
     exit 255
 fi
-source ${DHELPER_PATH}/.dhelper/arg_parse.bash
+source ${DHELPER_PATH}/.goose/arg_parse.bash
 
-# if [[ ! -f "${DHELPER_PATH}/.dhelper/dag.bash" ]]; then
-#     error "${DHELPER_PATH}/.dhelper/dag.bash is missing! Critical dependency! Exiting..." 255
+# if [[ ! -f "${DHELPER_PATH}/.goose/dag.bash" ]]; then
+#     error "${DHELPER_PATH}/.goose/dag.bash is missing! Critical dependency! Exiting..." 255
 # fi
-# source .dhelper/dag.bash
+# source .goose/dag.bash
 
-# if [[ ! -f "${DHELPER_PATH}/.dhelper/test.bash" ]]; then
-#     error "${DHELPER_PATH}.dhelper/test.bash is missing! Critical dependency! Exiting..." 255
+# if [[ ! -f "${DHELPER_PATH}/.goose/test.bash" ]]; then
+#     error "${DHELPER_PATH}.goose/test.bash is missing! Critical dependency! Exiting..." 255
 # fi
-# source $(.dhelper/test.bash
+# source $(.goose/test.bash
 
 if [[ ! -d "${PROJECT_PATH}/targets/" ]]; then
     error "no target directory! Nothing to run! Exiting..." 255
@@ -48,8 +51,7 @@ fi
 source ${PROJECT_PATH}/targets/common.bash
 
 function init () {
-    [[ ! -f .env ]] && echo -e "\n\n\n" > .env
-    source .env
+    [[ -f ${PROJECT_PATH}/.env ]] && source ${PROJECT_PATH}/.env
 }
 
 function cleanup () {

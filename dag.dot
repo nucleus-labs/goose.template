@@ -1,5 +1,0 @@
-digraph DAG {
-  subgraph cluster_target_t0 {
-    label = "t0";
-  }
-}

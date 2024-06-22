@@ -9,8 +9,8 @@ declare -A valid_flag_names
 declare -a flag_schedule
 declare -a flag_unschedule
 
-declare -a arguments
-arguments+=($*)
+declare -a arguments=($@) arguments_readonly=($@)
+readonly arguments_readonly
 
 declare -a builtin_targets
 
@@ -46,31 +46,36 @@ function error () {
 }
 # trap 'error "An unknown error has occurred" 255' ERR
 
+# (1: warn message)
 function warn () {
     local message="$1"
     local stack_size=${#FUNCNAME[@]}
     echo -e "[WARN] ${FUNCNAME[$stack_size-2]}@${BASH_SOURCE[$stack_size-2]}:${BASH_LINENO[$stack_size-3]}\n => ${message}\n" >&2
 }
 
-# (1: array name (global); 2: array type (-a/-A))
+# (1: array name (global))
 function arr_max_value () {
-    [[ -z "$1" ]]           && error "Array name is empty!" 80
+    [[ -z "$1" ]] && error "Array name is empty!" 80
+
     local arr_declare="$(declare -p "$1" 2>/dev/null)"
-    [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]                                            \
-                            && error "Variable '$1' does not exist!" 81
-    [[ ! -v "$1"    || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]    \
-                            && error "Variable '$1' is not an array!" 82
+    if [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]; then
+        error "Variable '$1' does not exist!" 81
+    fi
+
+    if [[ ! -v "$1" || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]; then
+        error "Variable '$1' is not an array!" 82
+    fi
     local -n arr="$1"
     local max_value=${arr[0]}
 
     for item in "${arr[@]}"; do
-        [[ ! $2 =~ ^[0-9]+$ ]]  && error "value '$2' is not a valid number!" 83
+        [[ ! $2 =~ ^[0-9]+$ ]] && error "value '$2' is not a valid number!" 83
         max_value=$(( ${item} > ${max_value} ? ${item} : ${max_value} ))
     done
     echo ${max_value}
 }
 
-# (1: array name (global); 2: index to pop; 3: array type (-a/-A))
+# (1: array name (global); 2: index to pop)
 function arr_pop () {
     [[ -z "$1" ]] && error "Array name is empty!" 90
 
@@ -441,7 +446,7 @@ function print_help () {
     # print help for targets
     if [[ $# -gt 0 ]]; then
         # echo "[cmd][built-in][${flag_help}]: $(is_builtin ${flag_help})"
-        if [[ ! -f "targets/${flag_help}.bash" && $(is_builtin "${flag_help}") == "n" ]]; then
+        if [[ ! -f "${PROJECT_PATH}/targets/${flag_help}.bash" && $(is_builtin "${flag_help}") == "n" ]]; then
             error "No such command '${flag_help}'" 255
 
         elif [[ $(is_builtin "${flag_help}") == "y" ]]; then
@@ -504,7 +509,7 @@ function print_help () {
             local current_target="${flag_help}"
 
             scrub_flags
-            source "targets/${current_target}.bash"
+            source "${PROJECT_PATH}/targets/${current_target}.bash"
 
             local arg_count=${#target_arguments[@]}
 
@@ -565,7 +570,7 @@ function print_help () {
         fi
     else # iterate through targets and collect info ; `$0 -h` or `$0 --help`
         echo "Main usage:"
-        echo "    $0 [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]..."
+        echo "    ${DHELPER_NAME} [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]..."
         echo
         echo "Help aliases:"
         echo "    ${DHELPER_NAME}"
@@ -650,32 +655,48 @@ function print_help () {
 
 # ================================================================================================
 #                                            BUILT-INS
-add_flag "h" "help" "prints this menu" 0
+add_flag 'h' "help" "prints this menu" 0
 function flag_name_help () {
     print_help
     exit 0
 }
 
-add_flag "-" "help-target" "prints help for a specific target" 0 "target" "string" "prints a target-specific help with more info"
+add_flag '-' "help-target" "prints help for a specific target" 0 "target" "string" "prints a target-specific help with more info"
 function flag_name_help_target () {
     print_help $1
     exit 0
 }
 
-add_flag "-" "debug--ignore-dependencies" "bypass the check for dependencies" 0
+add_flag '-' "debug--ignore-dependencies" "bypass the check for dependencies" 0
 function flag_name_debug__ignore_dependencies () {
     IGNORE_DEPENDENCIES=1
 }
 
-add_flag "-" "debug--preserve-flags" "prevents unsetting flags before loading targets" 0
+add_flag '-' "debug--preserve-flags" "prevents unsetting flags before loading targets" 0
 function flag_name_debug__preserve_flags () {
     PRESERVE_FLAGS=1
 }
 
-add_flag "-" "error" "simulates an error" 1 "exit code" "int" "exit code"
+add_flag '-' "error" "simulates an error" 1 "exit code" "int" "exit code"
 function flag_name_error () {
     echo "error: $1"
     return $1
+}
+
+add_flag 'g' "global" "use the global install of ${DHELPER_NAME}" 0
+function flag_name_global () {
+    echo ${readonly_arguments}
+}
+
+function dhelper_autocomplete () {
+    echo > /dev/null
+    # TODO: add pseudo-parsing of supplied arguments so that suggestions can be made
+}
+
+add_flag '-' "register-autocompletion" "use this flag to enable autocompletion of ${DHELPER_NAME}" 0
+function flag_name_register_autocompletion () {
+    complete -F dhelper_autocomplete ${DHELPER_NAME}
+    exit 0
 }
 
 builtin_targets+=("help")

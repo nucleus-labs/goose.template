@@ -1,27 +1,27 @@
 
-# DHelper
+# Goose
 
-DHelper is a dev tool to help manage a development environment and automate configurable tasks.
+Goose is a dev tool to help manage a development environment and automate configurable tasks.
 
 Usage:
 ```
 Main usage:
-    ./dhelper [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]...
+    goose [common-flag [flag-argument]]... <target> [target-flag [flag-argument]]... [target argument]...
 
 Help aliases:
-    ./dhelper
-    ./dhelper  -h
-    ./dhelper --help
-    ./dhelper   help
+    goose
+    goose  -h
+    goose --help
+    goose   help
 
 More detailed help aliases:
-    ./dhelper --help-target <target>
+    goose --help-target <target>
 ```
 
-dhelper utilizes a hierarchical registration model. At the top-level, you have registration common to all targets. This includes flags, helper functions, etc. Some of these are built-ins provided by dhelper, all others are defined in `targets/common.bash`.
+Goose utilizes a hierarchical registration model. At the top-level, you have registration common to all targets. This includes flags, helper functions, etc. Some of these are built-ins provided by goose, all others are defined in `targets/common.bash`.
 
 
-The core files for dhelper are as follows:
+The core files for goose are as follows:
 ```
     ./
     ╠═ targets/
@@ -29,7 +29,7 @@ The core files for dhelper are as follows:
     ║   ╚═ <target>.bash
     ╠═ .env
     ╠═ arg_parse.bash
-    ╠═ dhelper
+    ╠═ goose
     ║
     ╠═ .envrc
     ╠═ flake.nix
@@ -54,9 +54,9 @@ Let's break this down bit-by-bit:<br />
 `add_flag "-" "jobs" "sets the number of jobs/threads to use" 1 "job count" "int"` <br /><br />
 `add_flag` is how you register a flag. This is irrespective of registration level. The arguments are as follows:
 1. name-short           (char)
-    - a single-character string that designates a short-flag alias. `-` designates a lack of short-flag alias. (`./dhelper -h` as opposed to `./dhelper --help`)
+    - a single-character string that designates a short-flag alias. `-` designates a lack of short-flag alias. (`goose -h` as opposed to `goose --help`)
 2. name-verbose         (string)
-    - the long-form name of a flag. (eg. `help`: `./dhelper --help`)
+    - the long-form name of a flag. (eg. `help`: `goose --help`)
 3. description          (string)
     - a description of the flag's functionality
 4. priority             (int)
@@ -117,7 +117,7 @@ This is a unique target that is ignored by target validation and is specifically
 
 ### .env
 
-If a `.env` file does not exist when you run dhelper, it will be created. This will overwrite variable values from `arg_parse.bash` and `targets/common.bash`. Command-line flags will overwrite values defined in the `.env`. The precedent is as such: <br />
+If a `.env` file does not exist when you run goose, it will be created. This will overwrite variable values from `arg_parse.bash` and `targets/common.bash`. Command-line flags will overwrite values defined in the `.env`. The precedent is as such: <br />
 `arg_parse.bash` -> `targets/common.bash` -> `.env` -> `command-line flags`
 
 ### variadic target arguments
@@ -147,7 +147,7 @@ function target_dummy_types () {
 }
 ```
 usage:<br/>
-`./dhelper dummy-types 5 "hello" 1.0 2.5 900.1`
+`goose dummy-types 5 "hello" 1.0 2.5 900.1`
 
 output:
 ```
@@ -156,15 +156,16 @@ dummy2: hello
 dummy3: (1.0,2.5,900.1)
 ```
 
+<!--
 ## Build System
 
-Dhelper can also function as a comprehensive build system! This is done completely through the use of the `transforms` function, which describes how the target *transforms* an input into an output. 
+Goose can also function as a comprehensive build system! This is done completely through the use of the `transforms` function, which describes how the target *transforms* an input into an output. 
 
 Let's start with the syntax:<br/>
 `transforms "input1=>output1"`<br/>
 `transforms "input1,input2=>output2"`<br/>
 `transforms "input1,input3=>output2,output3"`<br/>
-All of these are valid ways to use `transforms`. Each one of these describes a collection of inputs that are necessary to generate the specified outputs. So if we say `transforms "input1,input3=>output2,output3"`, then in order to generate `output2`, dhelper will generate `input1` and `input3`, if those are generated.
+All of these are valid ways to use `transforms`. Each one of these describes a collection of inputs that are necessary to generate the specified outputs. So if we say `transforms "input1,input3=>output2,output3"`, then in order to generate `output2`, goose will generate `input1` and `input3`, if those are generated.
 
 But what exactly is an input? On their own, they can only be used to specificy other targets. But you can use deferred variable expansion to get more complex behaviour!
 
@@ -200,3 +201,5 @@ function target_build () {
     ${CC} ...
 }
 ```
+-->
+
