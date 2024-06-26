@@ -30,26 +30,8 @@
         devshells.default = {
 
           packages = with pkgs; [
-            # automake
-            # autoconf
-            # gnumake
-            # bc
-            # binutils
-            # cpio
-            # elfutils.dev
-            # file
-            # flock
-            # flex
-            # # openssl.dev
-            # perl
-            # rsync
-            # unzip
-            # wget
-            # which
-            # help2man
-            # tree
-            # zlib
-            # python
+            graphviz
+            shellcheck
           ];
 
           commands = [
