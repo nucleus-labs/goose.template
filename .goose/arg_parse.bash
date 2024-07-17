@@ -368,6 +368,7 @@ function validate_target () {
                     error "${msg}" 255
                 fi
             fi
+            target_arguments_provide+=("\"${arg}\"")
         else
             for arg in "${arguments[@]}"; do
                 arr_pop arguments 0
@@ -380,12 +381,9 @@ function validate_target () {
                         error "${msg}" 255
                     fi
                 fi
+                target_arguments_provide+=("\"${arg}\"")
             done
         fi
-
-        # dag_process_target_transforms
-
-        target_arguments_provide+=("\"${arg}\"")
     done
 
     eval "target_${target}" ${target_arguments_provide[@]}
