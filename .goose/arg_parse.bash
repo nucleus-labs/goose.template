@@ -39,7 +39,7 @@ function call_stack () {
 # (1: error message; 2: exit code)
 function error () {
     local message="$1"
-    local code="$2"
+    local code="${2:-255}"
     call_stack >&2
     echo -e "\n[ERROR][${code}]: ${message}"
     exit ${code}
@@ -68,8 +68,9 @@ function arr_max_value () {
     local -n arr="$1"
     local max_value=${arr[0]}
 
+    [[ ! $2 =~ ^[0-9]+$ ]] && error "value '$2' is not a valid number!" 83
+
     for item in "${arr[@]}"; do
-        [[ ! $2 =~ ^[0-9]+$ ]] && error "value '$2' is not a valid number!" 83
         max_value=$(( ${item} > ${max_value} ? ${item} : ${max_value} ))
     done
     echo ${max_value}
@@ -78,20 +79,20 @@ function arr_max_value () {
 # (1: array name (global); 2: index to pop)
 function arr_pop () {
     [[ -z "$1" ]] && error "Array name is empty!" 90
+    [[ -z "$2" ]] && error "No provided index!" 91
+    [[ ! $2 =~ ^[0-9]+$ ]] && error "Index '$2' is not a valid number!" 92
 
     local arr_declare="$(declare -p "$1" 2>/dev/null)"
 
-    [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]] && \
-        error "Variable '$1' does not exist or is empty!" 91
+    if [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]; then
+        error "Variable '$1' does not exist or is empty!" 93
+    fi
 
-    [[ ! -v "$1"    || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]] && \
-        error "Variable '$1' is not an array!" 92
+    if [[ ! -v "$1" || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]; then
+        error "Variable '$1' is not an array!" 94
+    fi
 
-    [[ ! $2 =~ ^[0-9]+$ ]]  && \
-        error "Index '$2' is not a valid number!" 93
-
-    [[ ! -v $1[$2] ]]       && \
-        error "Array element at index $2 does not exist!" 94
+    [[ ! -v $1[$2] ]] && error "Array element at index $2 does not exist!" 95
 
     eval "$1=(\${$1[@]:0:$2} \${$1[@]:$2+1})"
 }
@@ -103,9 +104,9 @@ function validate_dependencies () {
     local -a missing_deps
 
     for (( i=0; i<${#all_deps[@]}; i++ )); do
-        which "${all_deps[i]}" &> /dev/null
-        local _ret=$?
-        [[ ${_ret} -ne 0 ]] && missing_deps+=("\n\t${all_deps[i]}")
+        if ! which "${all_deps[i]}" &> /dev/null; then
+            missing_deps+=("\n\t${all_deps[i]}")
+        fi
     done
 
     if [[ ${#missing_deps} -ne 0 ]]; then
@@ -136,16 +137,14 @@ function add_flag () {
 
     # more complex validations
     for key in "${!valid_flags[@]}"; do # iterate over keys
-        [[ x"${valid_flags[${key}]}" == x"${flag}" ]]               && error "Flag <${flag}> already registered!"                      66
+        [[ "${valid_flags[${key}]}" == "${flag}" ]]               && error "Flag <${flag}> already registered!"                      66
     done
 
     for flag_name in "${!valid_flag_names[@]}"; do
-        [[ x"${valid_flag_names[${flag_name}]}" == x"${name}" ]]    && error "Flag name <${flag_name}> already registered!"            67
+        [[ "${valid_flag_names[${flag_name}]}" == "${name}" ]]    && error "Flag name <${flag_name}> already registered!"            67
     done
 
-    if [[ x"${argument}" != x"" ]]; then
-        [[ x"${argument_type}"   == x"" ]]  && error "Argument type must be provided for flag '${name}':'${argument}'"             68
-    fi
+    [[ -n "${argument}" && -z "${argument_type}" ]] && error "Argument type must be provided for flag '${name}':'${argument}'"       68
 
     # register information
     [[ "${flag}" != "-" ]] && valid_flags["${flag}"]="${name}"
@@ -160,7 +159,7 @@ function check_type () {
 
     local inferred_type
 
-    if   [[ "${arg}" =~ ^[0-9]+$ ]]; then
+    if [[ "${arg}" =~ ^[0-9]+$ ]]; then
         inferred_type="int"
     elif [[ "${arg}" =~ ^[+-]?[0-9]+\.?[0-9]*$ ]]; then
         inferred_type="float"
@@ -200,8 +199,7 @@ function validate_flag () {
         #  0: flag (single character); 1: name; 2: description; 3: priority;
         #  4: argument name; 5: argument type; 6: argument description
         local flag_arg
-        if [[ x"${unpacked_flag_data[4]}" != x"" ]]; then
-            # [[ x"${arguments[0]}" == x"" ]]
+        if [[ -n "${unpacked_flag_data[4]}" ]]; then
             flag_arg=" ${arguments[0]}"
             arr_pop arguments 0
 
@@ -241,7 +239,7 @@ function validate_flag_name () {
         #  0: flag (single character); 1: name; 2: description; 3: priority;
         #  4: argument name; 5: argument type; 6: argument description
         local flag_arg
-        if [[ x"${unpacked_flag_data[4]}" != x"" ]]; then
+        if [[ -n "${unpacked_flag_data[4]}" ]]; then
             [[ ${#arguments[@]} -eq 0 ]] \
                 && error "flag '${flag_name}' requires argument '${unpacked_flag_data[4]}' but wasn't provided!" 255
 
@@ -302,7 +300,7 @@ function scrub_flags () {
     declare -ga flag_schedule
     declare -ga flag_unschedule
 
-    if [[ ${PRESERVE_FLAGS} -eq 0 || x"${FORCE}" == x"force" ]]; then
+    if [[ ${PRESERVE_FLAGS} -eq 0 || "${FORCE}" == "force" ]]; then
         unset -v valid_flags valid_flag_names
 
         declare -gA valid_flags
@@ -320,15 +318,15 @@ function validate_target () {
     fi
     arr_pop arguments 0
 
-    if [[ ! -f "${PROJECT_PATH}/targets/${target}.bash" && "$(is_builtin ${target})" == "n" ]]; then
+    if [[ ! -f "${PROJECT_PATH}/targets/${target}.bash" ]] && ! is_builtin ${target}; then
         error "Target file '${PROJECT_PATH}/targets/${target}.bash' not found!" 255
     fi
 
-    DAG_TARGET_STACK+=("${target}")
+    # DAG_TARGET_STACK+=("${target}")
 
     scrub_flags
 
-    if [[ "$(is_builtin ${target})" == "n" ]]; then
+    if ! is_builtin ${target}; then
         source "${PROJECT_PATH}/targets/${target}.bash"
     else
         eval "target_${target}_builtin"
@@ -349,7 +347,7 @@ function validate_target () {
         local arg_type="${target_arg_types[i]}"
 
         local variadic=0
-        [[ x"${arg_type}" == x*... ]] && variadic=1
+        [[ "${arg_type}" == *... ]] && variadic=1
         arg_type=${arg_type%%...}
 
         if [[ ${variadic} -eq 0 ]]; then
@@ -392,7 +390,11 @@ function validate_target () {
 
 function is_builtin () {
     local target_check="$1"
-    [[ ${builtin_targets[@]} =~ ${target_check} ]] && echo "y" || echo "n"
+    if [[ ${builtin_targets[@]} =~ ${target_check} ]]; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 # (1: name; 2: type; 3: description)
@@ -403,7 +405,7 @@ function add_argument () {
 
     local detected_any=0
 
-    if [[ x"${type_}" == x"" ]]; then
+    if [[ -z "${type_}" ]]; then
         detected_any=1
         type_="any"
     fi
@@ -437,17 +439,16 @@ function print_help () {
     local flag_help="$1"
     local is_flag="$2"
 
-    if [[ x"${is_flag}" != x"" ]]; then
+    if [[ -n "${is_flag}" ]]; then
         return
     fi
 
     # print help for targets
     if [[ $# -gt 0 ]]; then
-        # echo "[cmd][built-in][${flag_help}]: $(is_builtin ${flag_help})"
-        if [[ ! -f "${PROJECT_PATH}/targets/${flag_help}.bash" && $(is_builtin "${flag_help}") == "n" ]]; then
+        if [[ ! -f "${PROJECT_PATH}/targets/${flag_help}.bash" ]] && ! is_builtin "${flag_help}"; then
             error "No such command '${flag_help}'" 255
 
-        elif [[ $(is_builtin "${flag_help}") == "y" ]]; then
+        elif is_builtin "${flag_help}"; then
             local current_target="${flag_help}"
             scrub_flags
             eval "target_${current_target}_builtin"
@@ -474,7 +475,7 @@ function print_help () {
                     [[ "${flag}" == "-" ]] && flag="" || flag="-${flag}"
 
                     echo "${flag};--${name};${priority};;;${description}"
-                    [[ x"${argument}" != x"" ]] && echo ";;;${argument};${argument_type};${arg_description}"
+                    [[ -n "${argument}" ]] && echo ";;;${argument};${argument_type};${arg_description}"
                     echo ";;;;;"
 
                 done
@@ -553,7 +554,7 @@ function print_help () {
                     [[ "${flag}" == "-" ]] && flag="" || flag="-${flag}"
 
                     echo "${flag};--${name};${priority};;;${description}"
-                    [[ x"${argument}" != x"" ]] && echo ";;;${argument};${argument_type};${arg_description}"
+                    [[ -n "${argument}" ]] && echo ";;;${argument};${argument_type};${arg_description}"
                     echo ";;;;;"
 
                 done
@@ -604,7 +605,7 @@ function print_help () {
                 [[ "${flag}" == "-" ]] && flag="" || flag="-${flag}"
 
                 echo "${flag};--${name};${priority};;;${description}"
-                [[ x"${argument}" != x"" ]] && echo ";;;${argument};${argument_type};${arg_description}"
+                [[ -n "${argument}" ]] && echo ";;;${argument};${argument_type};${arg_description}"
                 echo ";;;;;"
 
             done
