@@ -3,21 +3,21 @@
 # ================================================================================================
 #                                            GLOBALS
 
-declare -A valid_flags
-declare -A valid_flag_names
+declare -gA valid_flags
+declare -gA valid_flag_names
 
-declare -a flag_schedule
-declare -a flag_unschedule
+declare -ga flag_schedule
+declare -ga flag_unschedule
 
-declare -a arguments=($@) arguments_readonly=($@)
+declare -ga arguments=($@) arguments_readonly=($@)
 readonly arguments_readonly
 
-declare -a builtin_targets
+declare -ga builtin_targets
 
-declare     current_target
-declare -a  target_arguments
-declare -a  target_arg_types
-declare -a  target_arg_descs
+declare -g   current_target
+declare -ga  target_arguments
+declare -ga  target_arg_types
+declare -ga  target_arg_descs
 
 valid_arg_types=("any" "int" "float" "string")
 
@@ -27,7 +27,7 @@ PRESERVE_FLAGS=0
 
 # ================================================================================================
 #                                              UTILS
-function call_stack () {
+function call_stack {
     local i
     local stack_size=${#FUNCNAME[@]}
     echo "Call stack:"
@@ -37,7 +37,7 @@ function call_stack () {
 }
 
 # (1: error message; 2: exit code)
-function error () {
+function error {
     local message="$1"
     local code="${2:-255}"
     call_stack >&2
@@ -47,14 +47,14 @@ function error () {
 # trap 'error "An unknown error has occurred" 255' ERR
 
 # (1: warn message)
-function warn () {
+function warn {
     local message="$1"
     local stack_size=${#FUNCNAME[@]}
     echo -e "[WARN] ${FUNCNAME[$stack_size-2]}@${BASH_SOURCE[$stack_size-2]}:${BASH_LINENO[$stack_size-3]}\n => ${message}\n" >&2
 }
 
 # (1: array name (global))
-function arr_max_value () {
+function arr_max_value {
     [[ -z "$1" ]] && error "Array name is empty!" 80
 
     local arr_declare="$(declare -p "$1" 2>/dev/null)"
@@ -77,7 +77,7 @@ function arr_max_value () {
 }
 
 # (1: array name (global); 2: index to pop)
-function arr_pop () {
+function arr_pop {
     [[ -z "$1" ]] && error "Array name is empty!" 90
     [[ -z "$2" ]] && error "No provided index!" 91
     [[ ! $2 =~ ^[0-9]+$ ]] && error "Index '$2' is not a valid number!" 92
@@ -99,7 +99,7 @@ function arr_pop () {
 
 # ================================================================================================
 #                                       CORE FUNCTIONALITY
-function validate_dependencies () {
+function validate_dependencies {
     local all_deps=(${BUILTIN_DEPENDENCIES[@]} ${DEPENDENCIES[@]})
     local -a missing_deps
 
@@ -116,7 +116,7 @@ function validate_dependencies () {
 
 #  1: flag (single character); 2: name; 3: description; 4: priority;
 #  5: argument name; 6: argument type; 7: argument description
-function add_flag () {
+function add_flag {
     local flag="$1"
     local name="$2"
     local description="$3"
@@ -132,7 +132,7 @@ function add_flag () {
     [[ -z "${priority}" ]]              && error "Must provide a priority for flag '${name}'!"                     63
     [[ ! ${priority} =~ ^[0-9]+$ ]]     && error "Priority <${priority}> for flag '${name}' is not a number!"      64
     if [[ -n "${argument}" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]]; then
-        error "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!" 65
+        error "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!"                      65
     fi
 
     # more complex validations
@@ -154,7 +154,7 @@ function add_flag () {
 }
 
 # (1: variable)
-function check_type () {
+function check_type {
     local arg=$1
 
     local inferred_type
@@ -173,7 +173,7 @@ function check_type () {
 }
 
 # (1: flag (single character))
-function validate_flag () {
+function validate_flag {
     local flag="$1"
     local valid_flag_found=0
 
@@ -215,7 +215,7 @@ function validate_flag () {
 }
 
 # (1: flag name (string))
-function validate_flag_name () {
+function validate_flag_name {
     local flag_name="$1"
     local valid_flag_name_found=0
 
@@ -257,7 +257,7 @@ function validate_flag_name () {
     fi
 }
 
-function validate_flags () {
+function validate_flags {
     local arg="${arguments[0]}"
 
     if [[ "${arg:0:1}" != "-" ]]; then
@@ -279,7 +279,7 @@ function validate_flags () {
     validate_flags
 }
 
-function execute_flags () {
+function execute_flags {
     for (( i=0; i<10; i++ )); do
         for packed_item in "${flag_unschedule[@]}"; do
             eval local unpacked_item=(${packed_item})
@@ -292,7 +292,7 @@ function execute_flags () {
     done
 }
 
-function scrub_flags () {
+function scrub_flags {
     local FORCE="$1"
 
     unset -v flag_schedule flag_unschedule
@@ -308,7 +308,7 @@ function scrub_flags () {
     fi
 }
 
-function validate_target () {
+function validate_target {
     local target=${arguments[0]}
     local valid_target_found=0
 
@@ -338,6 +338,8 @@ function validate_target () {
         error "Target function 'target_${target}' was not found in '${PROJECT_PATH}/targets/${target}.bash'!" 255
     fi
 
+    current_target=${target}
+    add_flag 'h' "help" "print this help screen" 0
     validate_flags
     execute_flags
 
@@ -388,7 +390,12 @@ function validate_target () {
     # echo "target_${target} ${target_arguments_provide[@]}"
 }
 
-function is_builtin () {
+function scrub_arguments {
+    unset -v target_arguments target_arg_types target_arg_descs
+    declare -ga target_arguments target_arg_types target_arg_descs
+}
+
+function is_builtin {
     local target_check="$1"
     if [[ ${builtin_targets[@]} =~ ${target_check} ]]; then
         return 0
@@ -398,7 +405,7 @@ function is_builtin () {
 }
 
 # (1: name; 2: type; 3: description)
-function add_argument () {
+function add_argument {
     local name=$1
     local type_=$2
     local desc=$3
@@ -431,8 +438,11 @@ function add_argument () {
     target_arg_descs[$count]="${desc}"
 }
 
+# ================================================================================================
+#                                            BUILT-INS
+
 # (1: target (optional); 2: is flag)
-function print_help () {
+function print_help {
     local cols=$(tput cols)
     cols=$(( $cols > 22 ? $cols - 1 : 20 ))
 
@@ -502,12 +512,13 @@ function print_help () {
                     --output-width ${cols}                  \
                     --table-noheadings                      \
                     --table-columns "argument name,argument type,description"  \
-                    --table-wrap description 
+                    --table-wrap description
 
         else
             local current_target="${flag_help}"
 
             scrub_flags
+            scrub_arguments
             source "${PROJECT_PATH}/targets/${current_target}.bash"
 
             local arg_count=${#target_arguments[@]}
@@ -527,7 +538,7 @@ function print_help () {
                     --output-width ${cols}                  \
                     --table-noheadings                      \
                     --table-columns "argument name,argument type,description"  \
-                    --table-wrap description 
+                    --table-wrap description
 
             printf "%${cols}s\n" | tr " " "="
 
@@ -650,59 +661,59 @@ function print_help () {
     fi
 }
 
-
-
-# ================================================================================================
-#                                            BUILT-INS
 add_flag 'h' "help" "prints this menu" 0
-function flag_name_help () {
-    print_help
+function flag_name_help {
+    if [[ -z ${current_target} ]]; then
+        print_help
+    else
+        print_help ${current_target}
+    fi
     exit 0
 }
 
 add_flag '-' "help-target" "prints help for a specific target" 0 "target" "string" "prints a target-specific help with more info"
-function flag_name_help_target () {
+function flag_name_help_target {
     print_help $1
     exit 0
 }
 
 add_flag '-' "debug--ignore-dependencies" "bypass the check for dependencies" 0
-function flag_name_debug__ignore_dependencies () {
+function flag_name_debug__ignore_dependencies {
     IGNORE_DEPENDENCIES=1
 }
 
 add_flag '-' "debug--preserve-flags" "prevents unsetting flags before loading targets" 0
-function flag_name_debug__preserve_flags () {
+function flag_name_debug__preserve_flags {
     PRESERVE_FLAGS=1
 }
 
 add_flag '-' "error" "simulates an error" 1 "exit code" "int" "exit code"
-function flag_name_error () {
+function flag_name_error {
     echo "error: $1"
     return $1
 }
 
 add_flag 'g' "global" "use the global install of ${APP_NAME}" 0
-function flag_name_global () {
+function flag_name_global {
     echo ${readonly_arguments}
 }
 
-function goose_autocomplete () {
-    echo > /dev/null
+function goose_autocomplete {
+    return
     # TODO: add pseudo-parsing of supplied arguments so that suggestions can be made
 }
 
 add_flag '-' "register-autocompletion" "use this flag to enable autocompletion of ${APP_NAME}" 0
-function flag_name_register_autocompletion () {
+function flag_name_register_autocompletion {
     complete -F goose_autocomplete ${APP_NAME}
     exit 0
 }
 
 builtin_targets+=("help")
-function target_help_builtin () {
+function target_help_builtin {
     description="prints this menu"
 }
-function target_help () {
+function target_help {
     print_help
 }
 
