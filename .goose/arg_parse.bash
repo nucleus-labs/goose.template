@@ -19,7 +19,8 @@ declare -ga  target_arguments
 declare -ga  target_arg_types
 declare -ga  target_arg_descs
 
-valid_arg_types=("any" "int" "float" "string")
+declare -ga valid_arg_types=("any" "int" "float" "string" "path" "file" "directory")
+declare -ga valid_string_subtypes=("string" "path" "file" "directory")
 
 IGNORE_DEPENDENCIES=0
 BUILTIN_DEPENDENCIES=("tput")
@@ -44,7 +45,8 @@ function error {
     echo -e "\n[ERROR][${code}]: ${message}"
     exit ${code}
 }
-# trap 'error "An unknown error has occurred" 255' ERR
+alias  ERR_TRAP_ENABLE="trap 'error \"An unknown error has occurred\" 255' ERR"
+alias ERR_TRAP_DISABLE="trap '' ERR"
 
 # (1: warn message)
 function warn {
@@ -199,11 +201,12 @@ function validate_flag {
         #  0: flag (single character); 1: name; 2: description; 3: priority;
         #  4: argument name; 5: argument type; 6: argument description
         local flag_arg
-        if [[ -n "${unpacked_flag_data[4]}" ]]; then
+        if [[ -n "${unpacked_flag_data[4]}" && ! "${valid_string_subtypes[@]}" =~ "${unpacked_flag_data[5]}" ]]; then
             flag_arg=" ${arguments[0]}"
             arr_pop arguments 0
 
             local inferred_type=$(check_type "${flag_arg}")
+            # if not exact match, and (type was determined to be string, and provided type is a string subtype)
             if [[ "${inferred_type}" != "${unpacked_flag_data[5]}" ]]; then
                 local msg="Flag '${flag_name}' argument '${unpacked_flag_data[4]}' requires type '${unpacked_flag_data[5]}'. 
                     Inferred type of '${flag_arg}' is '${inferred_type}'"
@@ -239,7 +242,7 @@ function validate_flag_name {
         #  0: flag (single character); 1: name; 2: description; 3: priority;
         #  4: argument name; 5: argument type; 6: argument description
         local flag_arg
-        if [[ -n "${unpacked_flag_data[4]}" ]]; then
+        if [[ -n "${unpacked_flag_data[4]}" && ! "${valid_string_subtypes[@]}" =~ "${unpacked_flag_data[5]}" ]]; then
             [[ ${#arguments[@]} -eq 0 ]] \
                 && error "flag '${flag_name}' requires argument '${unpacked_flag_data[4]}' but wasn't provided!" 255
 
@@ -361,7 +364,7 @@ function validate_target {
             arr_pop arguments 0
 
             # TYPE CHECKING
-            if [[ "${arg_type}" != "any" && "${arg_type}" != "string" ]]; then
+            if [[ "${arg_type}" != "any" && ! "${valid_string_subtypes[@]}" =~ "${unpacked_flag_data[5]}" ]]; then
                 local inferred_type=$(check_type "${arg}")
                 if [[ "${inferred_type}" != "${arg_type}" ]]; then
                     local msg="Target '${target}' argument '${arg_name}' requires type '${arg_type}'. \nInferred type of '${arg}' is '${inferred_type}'"
@@ -374,8 +377,9 @@ function validate_target {
                 arr_pop arguments 0
 
                 # TYPE CHECKING
-                if [[ "${arg_type}" != "any" && "${arg_type}" != "string" ]]; then
+                if [[ "${arg_type}" != "any" && ! "${valid_string_subtypes[@]}" =~ "${unpacked_flag_data[5]}" ]]; then
                     local inferred_type=$(check_type "${arg}")
+                    # if not exact match, and (type was determined to be string, and provided type is a string subtype)
                     if [[ "${inferred_type}" != "${arg_type}" ]]; then
                         local msg="Target '${target}' argument '${arg_name}' requires type '${arg_type}'. \nInferred type of '${arg}' is '${inferred_type}'"
                         error "${msg}" 255

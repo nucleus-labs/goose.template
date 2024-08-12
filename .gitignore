@@ -2,6 +2,6 @@
 .direnv/
 .check.txt
 .env
-targets/*.bash
+targets/*
 !targets/common.bash
 extras/*
