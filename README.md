@@ -43,7 +43,7 @@ The 2nd group of files, `.envrc`, `flake.nix`, and `flake.lock` are provided for
 Flags are defined on two layers: common, and target-specific. The difference between them is that common flags are defined in `targets/common.bash` or as a builtin, and are parsed and executed before the target. Target-specific flags are defined in [target definitions](#targets). While they are defined in different locations depending on use-case, how they are defined is identical, and is as follows:
 ```bash
 add_flag "-" "jobs" "sets the number of jobs/threads to use" 1 "job count" "int"
-function flag_name_jobs () {
+function flag_name_jobs {
     JOBS=$1
     [[ ! ${JOBS} =~ ^[0-9]+$ ]] && error "JOBS value '${JOBS}' is not a valid integer!" 15
     debug "Using -j${JOBS}"
@@ -71,9 +71,9 @@ Let's break this down bit-by-bit:<br />
 
 Next we have
 ```bash
-function flag_name_jobs () {
+function flag_name_jobs {
 ```
-This declares and defined the function called when the flag (as registered with `add_flag`) is used. This is pattern-matched using `flag_name_<name-verbose>`, where occurrences of a hyphen (`"-"`) are converted to underscores. So `--job-count` would be `"function flag_name_job_count () { ... }"`
+This declares and defined the function called when the flag (as registered with `add_flag`) is used. This is pattern-matched using `flag_name_<name-verbose>`, where occurrences of a hyphen (`"-"`) are converted to underscores. So `--job-count` would be `"function flag_name_job_count { ... }"`
 
 The next step is `JOBS=$1`. A flag's argument is consumed from the command line input during parsing, and provided to the handler function during execution, so it's safe to directly use `"$1"`. However, there are no optional flag arguments, so keep this in mind when you're designing and implementing your flags.
 
@@ -91,7 +91,7 @@ add_argument "dummy1" "int"     "a dummy int"
 add_argument "dummy2" "float"   "a dummy float"
 add_argument "dummy3" "string"  "a dummy string"
 
-function target_dummy_types () {
+function target_dummy_types {
     echo "dummy1: $1"
     echo "dummy2: $2"
     echo "dummy3: $3"
@@ -133,7 +133,7 @@ add_argument "dummy1" "int"      "a dummy int"
 add_argument "dummy2" "string"   "a dummy string"
 add_argument "dummy3" "float..." "a dummy float"
 
-function target_dummy_types () {
+function target_dummy_types {
     echo "dummy1: $1"
     echo "dummy2: $2"
 
@@ -197,7 +197,7 @@ transforms "%{flag: this->backend}=>my-exe"
 
 add_flag '-' "backend" "the backend to use" 0 "backend" "string"
 
-function target_build () {
+function target_build {
     ${CC} ...
 }
 ```
