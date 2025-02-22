@@ -19,14 +19,18 @@ declare -ga  target_arguments
 declare -ga  target_arg_types
 declare -ga  target_arg_descs
 
-valid_arg_types=("any" "int" "float" "string")
+declare -ga valid_arg_types=("any" "int" "float" "string")
 
-IGNORE_DEPENDENCIES=0
-BUILTIN_DEPENDENCIES=("tput")
-PRESERVE_FLAGS=0
+declare -g IGNORE_DEPENDENCIES=0
+declare -ga BUILTIN_DEPENDENCIES=("tput")
+declare -g PRESERVE_FLAGS=0
 
 # ================================================================================================
 #                                              UTILS
+
+# Prints a formatted call stack trace.
+# Arguments: None.
+# Return: None.
 function call_stack {
     local i
     local stack_size=${#FUNCNAME[@]}
@@ -36,7 +40,11 @@ function call_stack {
     done
 }
 
-# (1: error message; 2: exit code)
+# Prints an error message to stderr, prints a call stack trace, outputs an error message, and exits.
+# Arguments:
+#   $1 - Error message.
+#   $2 - Exit code (optional, defaults to 255).
+# Return: None.
 function error {
     local message="$1"
     local code="${2:-255}"
@@ -46,37 +54,21 @@ function error {
 }
 # trap 'error "An unknown error has occurred" 255' ERR
 
-# (1: warn message)
+# Prints a warning message to stderr (including the caller's function, source file, and line number).
+# Arguments:
+#   $1 - Warning message.
+# Return: None.
 function warn {
     local message="$1"
     local stack_size=${#FUNCNAME[@]}
     echo -e "[WARN] ${FUNCNAME[$stack_size-2]}@${BASH_SOURCE[$stack_size-2]}:${BASH_LINENO[$stack_size-3]}\n => ${message}\n" >&2
 }
 
-# (1: array name (global))
-function arr_max_value {
-    [[ -z "$1" ]] && error "Array name is empty!" 80
-
-    local arr_declare="$(declare -p "$1" 2>/dev/null)"
-    if [[ -z "${!1+x}" || "${arr_declare}" != "declare"* ]]; then
-        error "Variable '$1' does not exist!" 81
-    fi
-
-    if [[ ! -v "$1" || "${arr_declare}" != "declare -a"* && "${arr_declare}" != "declare -A"* ]]; then
-        error "Variable '$1' is not an array!" 82
-    fi
-    local -n arr="$1"
-    local max_value=${arr[0]}
-
-    [[ ! $2 =~ ^[0-9]+$ ]] && error "value '$2' is not a valid number!" 83
-
-    for item in "${arr[@]}"; do
-        max_value=$(( ${item} > ${max_value} ? ${item} : ${max_value} ))
-    done
-    echo ${max_value}
-}
-
-# (1: array name (global); 2: index to pop)
+# Removes an element from a global array at a specified index.
+# Arguments:
+#   $1 - Name of the array variable.
+#   $2 - Index of the element to pop.
+# Return: None.
 function arr_pop {
     [[ -z "$1" ]] && error "Array name is empty!" 90
     [[ -z "$2" ]] && error "No provided index!" 91
@@ -99,6 +91,11 @@ function arr_pop {
 
 # ================================================================================================
 #                                       CORE FUNCTIONALITY
+
+# Checks that required dependencies (defined in `BUILTIN_DEPENDENCIES` and `BUILTIN_DEPENDENCIES`)
+# are present in the current PATH and reports any missing ones, erroring if any are missing.
+# Arguments: None.
+# Return: None.
 function validate_dependencies {
     local all_deps=(${BUILTIN_DEPENDENCIES[@]} ${DEPENDENCIES[@]})
     local -a missing_deps
@@ -114,8 +111,25 @@ function validate_dependencies {
     fi
 }
 
-#  1: flag (single character); 2: name; 3: description; 4: priority;
-#  5: argument name; 6: argument type; 7: argument description
+# Add a flag to the current context (irrespective of being in common or target). Implementation
+# MUST be in a function with the name `flag_name_<long flag name>`, in the same context
+# (preferably immediately following the call to `add_flag`).
+#
+# Short flag names are optional. For flags without a short name, use '-'.
+#
+# Flags are executed based on their registered priority score, NOT in the provided order.
+#
+# Some flags have an argument, some do not. For those that don't, arguments 5, 6, and 7 should
+# be ignored. For those that do, all 3 of arguments 5, 6, and 7 must *ALL* be provided.
+# Arguments:
+#   $1 - flag name (short) (single character)
+#   $2 - flag name (long)
+#   $3 - description
+#   $4 - priority (integer)
+#   $5 - (OPTIONAL) argument name
+#   $6 - (OPTIONAL-DEPENDENT) argument type
+#   $7 - (OPTIONAL-DEPENDENT) argument description
+# Return: None.
 function add_flag {
     local flag="$1"
     local name="$2"
@@ -131,20 +145,27 @@ function add_flag {
     [[ -z "${description}" ]]           && error "Description for flag '${name}' cannot be empty!"                 62
     [[ -z "${priority}" ]]              && error "Must provide a priority for flag '${name}'!"                     63
     [[ ! ${priority} =~ ^[0-9]+$ ]]     && error "Priority <${priority}> for flag '${name}' is not a number!"      64
+
     if [[ -n "${argument}" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]]; then
-        error "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!"                      65
+        error "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!" 65
     fi
 
     # more complex validations
     for key in "${!valid_flags[@]}"; do # iterate over keys
-        [[ "${valid_flags[${key}]}" == "${flag}" ]]               && error "Flag <${flag}> already registered!"                      66
+        if [[ "${valid_flags[${key}]}" == "${flag}" ]]; then
+            error "Flag <${flag}> already registered!" 66
+        fi
     done
 
     for flag_name in "${!valid_flag_names[@]}"; do
-        [[ "${valid_flag_names[${flag_name}]}" == "${name}" ]]    && error "Flag name <${flag_name}> already registered!"            67
+        if [[ "${valid_flag_names[${flag_name}]}" == "${name}" ]]; then
+            error "Flag name <${flag_name}> already registered!" 67
+        fi
     done
 
-    [[ -n "${argument}" && -z "${argument_type}" ]] && error "Argument type must be provided for flag '${name}':'${argument}'"       68
+    if [[ -n "${argument}" && -z "${argument_type}" ]]; then
+        error "Argument type must be provided for flag '${name}':'${argument}'" 68
+    fi
 
     # register information
     [[ "${flag}" != "-" ]] && valid_flags["${flag}"]="${name}"
@@ -153,7 +174,10 @@ function add_flag {
     valid_flag_names[${name}]="${packed}"
 }
 
-# (1: variable)
+# Pass a value to this function to try and determine its type.
+# Arguments:
+#   $1 - variable value
+# Return: "int" | "float" | "string" | <error>
 function check_type {
     local arg=$1
 
@@ -172,8 +196,11 @@ function check_type {
     echo "${inferred_type}"
 }
 
-# (1: flag (single character))
-function validate_flag {
+# Validate the use of a short flag during runtime
+# Arguments:
+#   $1 - flag short name (single character)
+# Return: None.
+function validate_short_flag {
     local flag="$1"
     local valid_flag_found=0
 
@@ -214,8 +241,11 @@ function validate_flag {
     fi
 }
 
-# (1: flag name (string))
-function validate_flag_name {
+# Validate the use of a long flag during runtime
+# Arguments:
+#   $1 - flag long name
+# Return: None.
+function validate_flag_long {
     local flag_name="$1"
     local valid_flag_name_found=0
 
@@ -257,6 +287,9 @@ function validate_flag_name {
     fi
 }
 
+# Consume, validate, and process cli arguments beginning with a dash ('-')
+# Arguments: None.
+# Return: None.
 function validate_flags {
     local arg="${arguments[0]}"
 
@@ -269,16 +302,19 @@ function validate_flags {
     if [[ "${arg:1:1}" != "-" ]]; then
         local flags=${arg}
         for (( i=1; i<${#flags}; i++ )); do
-            validate_flag "${flags:$i:1}"
+            validate_short_flag "${flags:$i:1}"
         done
     else
-        validate_flag_name "${arg:2}"
+        validate_flag_long "${arg:2}"
     fi
 
     # TODO: do not recursion
     validate_flags
 }
 
+# Consume, validate, and process remaining arguments
+# Arguments: None.
+# Return: None.
 function execute_flags {
     for (( i=0; i<10; i++ )); do
         for packed_item in "${flag_unschedule[@]}"; do
@@ -292,6 +328,9 @@ function execute_flags {
     done
 }
 
+# Reset global state related to flags
+# Arguments: None.
+# Return: None.
 function scrub_flags {
     local FORCE="$1"
 
@@ -308,6 +347,9 @@ function scrub_flags {
     fi
 }
 
+# Consume, validate, and process cli arguments not beginning with a dash ('-')
+# Arguments: None.
+# Return: None.
 function validate_target {
     local target=${arguments[0]}
     local valid_target_found=0
@@ -390,11 +432,18 @@ function validate_target {
     # echo "target_${target} ${target_arguments_provide[@]}"
 }
 
+# Reset global state related to target arguments
+# Arguments: None.
+# Return: None.
 function scrub_arguments {
     unset -v target_arguments target_arg_types target_arg_descs
     declare -ga target_arguments target_arg_types target_arg_descs
 }
 
+# Checks if a target is builtin by goose
+# Arguments:
+#   $1 - target name
+# Return: 0 | 1
 function is_builtin {
     local target_check="$1"
     if [[ ${builtin_targets[@]} =~ ${target_check} ]]; then
@@ -404,7 +453,11 @@ function is_builtin {
     fi
 }
 
-# (1: name; 2: type; 3: description)
+# Add an argument to a target
+# Arguments:
+#   $1 - argument name
+#   $2 - argument type
+#   $3 - argument description
 function add_argument {
     local name=$1
     local type_=$2
@@ -441,7 +494,11 @@ function add_argument {
 # ================================================================================================
 #                                            BUILT-INS
 
-# (1: target (optional); 2: is flag)
+# print the help text associated with a target if provided, else print help text listing targets
+# and global flags.
+# Arguments:
+#   $1 - target name (optional)
+#   $2 - is flag (optional)
 function print_help {
     local cols=$(tput cols)
     cols=$(( $cols > 22 ? $cols - 1 : 20 ))

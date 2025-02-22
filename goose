@@ -31,16 +31,6 @@ if [[ ! -d "${APP_PATH}/.goose" || ! -f "${APP_PATH}/.goose/arg_parse.bash" ]]; 
 fi
 source ${APP_PATH}/.goose/arg_parse.bash
 
-# if [[ ! -f "${APP_PATH}/.goose/dag.bash" ]]; then
-#     error "${APP_PATH}/.goose/dag.bash is missing! Critical dependency! Exiting..." 255
-# fi
-# source .goose/dag.bash
-
-# if [[ ! -f "${APP_PATH}/.goose/test.bash" ]]; then
-#     error "${APP_PATH}.goose/test.bash is missing! Critical dependency! Exiting..." 255
-# fi
-# source $(.goose/test.bash
-
 if [[ ! -d "${PROJECT_PATH}/targets/" ]]; then
     error "no target directory! Nothing to run! Exiting..." 255
 fi
