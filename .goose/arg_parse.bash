@@ -10,6 +10,7 @@ declare -ga flag_schedule
 declare -ga flag_unschedule
 
 declare -ga arguments
+declare -ga readonly_arguments
 
 declare -ga builtin_targets
 
@@ -25,10 +26,13 @@ declare -ga BUILTIN_DEPENDENCIES
 declare -g PRESERVE_FLAGS
 
 arguments=($@)
+readonly_arguments=($@)
 valid_arg_types=("any" "int" "float" "string")
 IGNORE_DEPENDENCIES=0
 BUILTIN_DEPENDENCIES=("tput")
 PRESERVE_FLAGS=0
+
+readonly readonly_arguments
 
 # ================================================================================================
 #                                              UTILS
@@ -68,7 +72,7 @@ function error {
 
     call_stack >&2
     echo -e "\n[ERROR][${code}]: ${message}"
-    exit ${code}
+    exit "${code}"
 }
 # trap 'error "An unknown error has occurred" 255' ERR
 
@@ -196,7 +200,7 @@ function add_flag {
     [[ -z "${priority}" ]]              && error "Must provide a priority for flag '${name}'!"                     63
     [[ ! ${priority} =~ ^[0-9]+$ ]]     && error "Priority <${priority}> for flag '${name}' is not a number!"      64
 
-    if [[ -n "${argument}" && ! ${valid_arg_types[@]} =~ "${argument_type}" ]]; then
+    if [[ -n "${argument}" && ! ${valid_arg_types[*]} =~ ${argument_type} ]]; then
         error "Flag argument type for '${name}':'${argument}' (${argument_type}) is invalid!" 65
     fi
 
@@ -426,7 +430,6 @@ function scrub_flags {
 # Return: None.
 function validate_target {
     local target
-    local valid_target_found
     local target_arguments_provide
     local arg_name
     local arg_type
@@ -436,7 +439,6 @@ function validate_target {
     local inferred_type
 
     target=${arguments[0]}
-    valid_target_found=0
 
     if [[ ${#arguments[@]} -eq 0 ]]; then
         print_help
@@ -444,13 +446,13 @@ function validate_target {
     fi
     arr_pop arguments 0
 
-    if [[ ! -f "${PROJECT_PATH}/targets/${target}.bash" ]] && ! is_builtin ${target}; then
+    if [[ ! -f "${PROJECT_PATH}/targets/${target}.bash" ]] && ! is_builtin "${target}"; then
         error "Target file '${PROJECT_PATH}/targets/${target}.bash' not found!" 255
     fi
 
     scrub_flags
 
-    if ! is_builtin ${target}; then
+    if ! is_builtin "${target}"; then
         source "${PROJECT_PATH}/targets/${target}.bash"
     else
         eval "target_${target}_builtin"
@@ -528,7 +530,7 @@ function scrub_arguments {
 function is_builtin {
     local target_check
     target_check="$1"
-    if [[ ${builtin_targets[@]} =~ ${target_check} ]]; then
+    if [[ ${builtin_targets[*]} =~ ${target_check} ]]; then
         return 0
     else
         return 1
@@ -564,7 +566,7 @@ function add_argument {
     [[ "${type_}" == *... ]] && variadic=1
     type_="${type_%%...}"
 
-    if [[ "${name}" == "" || "${desc}" == "" || ! ${valid_arg_types[@]} =~ "${type_}" ]]; then
+    if [[ "${name}" == "" || "${desc}" == "" || ! ${valid_arg_types[*]} =~ ${type_} ]]; then
         msg="\n\tadd_argument usage is: 'add_argument \"<name>\" \"<${valid_arg_types[*]}>\" \"<description>\"'\n"
         [[ ${detected_any} -eq 1 ]] && msg+="\t(auto-detected type as \"any\")\n"
         msg+="\tWhat you provided:\n"
@@ -607,7 +609,7 @@ function print_help {
     local flag_count
 
     cols=$(tput cols)
-    cols=$(( $cols > 22 ? $cols - 1 : 20 ))
+    cols=$(( cols > 22 ? cols - 1 : 20 ))
 
     flag_help="$1"
     is_flag="$2"
@@ -666,7 +668,7 @@ function print_help {
                 echo "argument name |;argument type |;description"
                 echo ";;"
 
-                for (( i=0; i<${arg_count}; i++ )); do
+                for (( i=0; i<arg_count; i++ )); do
                     echo "${target_arguments[i]};${target_arg_types[i]};${target_arg_descs[i]}"
                 done
             } | column                                      \
@@ -692,7 +694,7 @@ function print_help {
                 echo "argument name |;argument type |;description"
                 echo ";;"
 
-                for (( i=0; i<${arg_count}; i++ )); do
+                for (( i=0; i<arg_count; i++ )); do
                     echo "${target_arguments[i]};${target_arg_types[i]};${target_arg_descs[i]}"
                 done
             } | column                                      \
@@ -798,7 +800,7 @@ function print_help {
         echo "Targets:"
         {
             echo ";;;"
-            for file in ${PROJECT_PATH}/targets/*.bash; do
+            for file in "${PROJECT_PATH}"/targets/*.bash; do
                 current_target="${file##*/}"
                 current_target="${current_target%.bash}"
 
@@ -809,7 +811,7 @@ function print_help {
                 target_arg_descs=()
 
                 scrub_flags "force"
-                source ${file}
+                source "${file}"
 
                 flag_count=${#valid_flag_names[@]}
                 arg_count=${#target_arguments[@]}
@@ -831,14 +833,18 @@ function flag_name_help {
     if [[ -z ${current_target} ]]; then
         print_help
     else
-        print_help ${current_target}
+        print_help "${current_target}"
     fi
     exit 0
 }
 
 add_flag '-' "help-target" "prints help for a specific target" 0 "target" "string" "prints a target-specific help with more info"
 function flag_name_help_target {
-    print_help $1
+    local help_target
+
+    help_target="$1"
+
+    print_help "${help_target}"
     exit 0
 }
 
@@ -854,13 +860,17 @@ function flag_name_debug__preserve_flags {
 
 add_flag '-' "error" "simulates an error" 1 "exit code" "int" "exit code"
 function flag_name_error {
-    echo "error: $1"
-    return $1
+    local exit_code
+
+    exit_code="$1"
+
+    echo "error: ${exit_code}"
+    return "${exit_code}"
 }
 
 add_flag 'g' "global" "use the global install of ${APP_NAME}" 0
 function flag_name_global {
-    echo ${readonly_arguments}
+    echo "${readonly_arguments}"
 }
 
 function goose_autocomplete {
@@ -870,7 +880,7 @@ function goose_autocomplete {
 
 add_flag '-' "register-autocompletion" "use this flag to enable autocompletion of ${APP_NAME}" 0
 function flag_name_register_autocompletion {
-    complete -F goose_autocomplete ${APP_NAME}
+    complete -F goose_autocomplete "${APP_NAME}"
     exit 0
 }
 
